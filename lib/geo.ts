@@ -1,38 +1,31 @@
-// ZIP -> approximate centroid, and distance in miles.
+// Locations: ZIP centroids, distances, nearest ZIP and named areas.
 //
-// HOUSTON_ZIPS is a small built-in table of APPROXIMATE centroids (about ±1 mile) so the demo works
-// offline. For production run `npm run import:zcta` with the Census Gazetteer ZCTA file; it fills
-// data/zcta.json, which takes priority over this table.
+// data/zcta.json holds official U.S. Census 2024 Gazetteer ZCTA centroids for the 77xxx ZIPs
+// (Greater Houston, Golden Triangle, Brazos Valley, Victoria). Run `npm run import:zcta` to add more.
+// Exact coordinates (from a device's location, or a job site) take priority over ZIP centroids.
 import zcta from "@/data/zcta.json";
 
-const HOUSTON_ZIPS: Record<string, [number, number]> = {
-  "77002": [29.756, -95.365], "77003": [29.749, -95.346], "77004": [29.724, -95.363],
-  "77007": [29.771, -95.411], "77008": [29.799, -95.411], "77012": [29.718, -95.276],
-  "77015": [29.785, -95.185], "77017": [29.686, -95.255], "77029": [29.762, -95.259],
-  "77036": [29.700, -95.535], "77040": [29.874, -95.528], "77057": [29.743, -95.488],
-  "77060": [29.934, -95.398], "77072": [29.700, -95.585], "77084": [29.830, -95.660],
-  "77092": [29.832, -95.474], "77381": [30.170, -95.495], "77429": [29.982, -95.664],
-  "77449": [29.836, -95.735], "77450": [29.746, -95.738], "77479": [29.578, -95.630],
-  "77493": [29.866, -95.830], "77494": [29.740, -95.825], "77502": [29.679, -95.199],
-  "77506": [29.708, -95.200], "77520": [29.747, -94.965], "77530": [29.789, -95.117],
-  "77536": [29.687, -95.115], "77546": [29.520, -95.190], "77571": [29.669, -95.040],
-  "77573": [29.500, -95.090], "77581": [29.562, -95.270], "77587": [29.660, -95.226],
-  "77590": [29.400, -94.920],
-};
+export type Point = [number, number]; // [lat, lng]
 
-const TABLE = zcta as Record<string, [number, number]>;
+const TABLE = zcta as unknown as Record<string, Point>;
+const ZIPS = Object.keys(TABLE);
 
-export function zipToPoint(zip: string | null | undefined): [number, number] | null {
+export function zipToPoint(zip: string | null | undefined): Point | null {
   if (!zip) return null;
-  const z = zip.trim().slice(0, 5);
-  return TABLE[z] ?? HOUSTON_ZIPS[z] ?? null;
+  return TABLE[zip.trim().slice(0, 5)] ?? null;
 }
 
 export function knownZips(): string[] {
-  return Object.keys({ ...HOUSTON_ZIPS, ...TABLE }).sort();
+  return [...ZIPS].sort();
 }
 
-export function milesBetween(a: [number, number], b: [number, number]): number {
+/** Exact point if present, else the ZIP centroid. */
+export function pointOf(x: { lat?: number | null; lng?: number | null; zip?: string | null }): Point | null {
+  if (typeof x.lat === "number" && typeof x.lng === "number" && Number.isFinite(x.lat) && Number.isFinite(x.lng)) return [x.lat, x.lng];
+  return zipToPoint(x.zip ?? null);
+}
+
+export function milesBetween(a: Point, b: Point): number {
   const R = 3958.8;
   const rad = (d: number) => (d * Math.PI) / 180;
   const dLat = rad(b[0] - a[0]);
@@ -41,8 +34,60 @@ export function milesBetween(a: [number, number], b: [number, number]): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-export function zipDistance(a: string | null, b: string | null): number | null {
-  const pa = zipToPoint(a);
-  const pb = zipToPoint(b);
+export function distanceMiles(a: Parameters<typeof pointOf>[0], b: Parameters<typeof pointOf>[0]): number | null {
+  const pa = pointOf(a);
+  const pb = pointOf(b);
   return pa && pb ? milesBetween(pa, pb) : null;
+}
+
+/** Kept for older callers. */
+export function zipDistance(a: string | null, b: string | null): number | null {
+  return distanceMiles({ zip: a }, { zip: b });
+}
+
+/** Closest known ZIP to a point, with its distance in miles. */
+export function nearestZip(lat: number, lng: number): { zip: string; miles: number } | null {
+  let best: { zip: string; miles: number } | null = null;
+  for (const z of ZIPS) {
+    const m = milesBetween([lat, lng], TABLE[z]);
+    if (!best || m < best.miles) best = { zip: z, miles: m };
+  }
+  return best;
+}
+
+/** Named areas for people who'd rather pick a place than share their location. */
+export const AREAS: { label: string; zip: string }[] = [
+  { label: "Downtown Houston", zip: "77002" },
+  { label: "Pasadena", zip: "77506" },
+  { label: "Deer Park", zip: "77536" },
+  { label: "La Porte", zip: "77571" },
+  { label: "Baytown", zip: "77520" },
+  { label: "Channelview", zip: "77530" },
+  { label: "Galena Park", zip: "77547" },
+  { label: "South Houston", zip: "77587" },
+  { label: "Pearland", zip: "77581" },
+  { label: "League City", zip: "77573" },
+  { label: "Texas City", zip: "77590" },
+  { label: "Alief", zip: "77072" },
+  { label: "Katy", zip: "77449" },
+  { label: "Cypress", zip: "77429" },
+  { label: "Spring", zip: "77373" },
+  { label: "The Woodlands", zip: "77381" },
+  { label: "Humble", zip: "77338" },
+  { label: "Conroe", zip: "77301" },
+  { label: "Sugar Land", zip: "77479" },
+  { label: "Missouri City", zip: "77489" },
+  { label: "Freeport", zip: "77541" },
+  { label: "Park Place", zip: "77017" },
+  { label: "Jacinto City", zip: "77029" },
+  { label: "Cloverleaf", zip: "77015" },
+  { label: "Sharpstown", zip: "77036" },
+  { label: "West Houston", zip: "77084" },
+  { label: "Stafford", zip: "77477" },
+  { label: "Beaumont", zip: "77701" },
+  { label: "Port Arthur", zip: "77640" },
+];
+
+export function areaLabel(zip: string | null | undefined): string | null {
+  return AREAS.find((a) => a.zip === zip)?.label ?? null;
 }

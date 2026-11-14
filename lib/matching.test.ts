@@ -47,6 +47,15 @@ describe("findCredential", () => {
 });
 
 describe("evaluateMatch", () => {
+  it("blocks another trade unless they have at least half the job's skills", () => {
+    const creds = [cred("osha10"), cred("twic", { expiresOn: "2029-01-01" })];
+    const sparky = worker({ trade: "electrician", skills: ["conduit_bending"] });
+    expect(evaluateMatch(sparky, creds, job(), TODAY).gaps.find((g) => g.kind === "trade")?.blocking).toBe(true);
+    const welderWhoFits = worker({ trade: "welder", skills: ["pipe_isometrics", "carbon_steel_pipe"] });
+    expect(evaluateMatch(welderWhoFits, creds, job(), TODAY).gaps.find((g) => g.kind === "trade")?.blocking).toBe(false);
+    expect(evaluateMatch(sparky, [cred("osha10")], job({ trade: "helper", requiredCredentials: ["osha10"], requiredSkills: [] }), TODAY).eligible).toBe(true);
+  });
+
   it("is eligible when every hard requirement is met, and reports soft gaps", () => {
     const r = evaluateMatch(worker(), [cred("osha10"), cred("twic", { expiresOn: "2029-01-01" })], job(), TODAY);
     expect(r.eligible).toBe(true);

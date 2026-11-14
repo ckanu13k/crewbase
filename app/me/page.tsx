@@ -9,6 +9,9 @@ import { t } from "@/lib/i18n";
 import { credentialStatus } from "@/lib/matching";
 import { credLabel, skillLabel, tradeLabel } from "@/lib/taxonomy";
 import { gapText, shiftLabel } from "@/lib/training";
+import { LocationBar } from "@/components/LocationBar";
+import { AREAS } from "@/lib/geo";
+import { getUserLocation } from "@/lib/location";
 
 export default async function WorkerHome() {
   const s = await requireWorker();
@@ -16,6 +19,7 @@ export default async function WorkerHome() {
   const { worker, creds, fits, close, today } = await workerContext(s.workerId);
   if (!worker || !worker.onboardingComplete) redirect("/onboard");
   const es = lang === "es";
+  const loc = await getUserLocation(worker);
 
   const alerts = creds.filter((c) => ["expired", "expiring"].includes(credentialStatus(c, today)));
   const unverified = creds.filter((c) => c.verification === "self").length;
@@ -53,7 +57,7 @@ export default async function WorkerHome() {
           ))}
         </div>
         <div className="relative mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-blue-100">
-          {worker.zip && <span className="flex items-center gap-1"><MapPin size={13} /> {worker.zip}{worker.radiusMiles ? ` · ${worker.radiusMiles} mi` : ""}</span>}
+          {worker.zip && <span className="flex items-center gap-1"><MapPin size={13} /> {loc?.label ?? worker.zip}{worker.radiusMiles ? ` · ${worker.radiusMiles} mi` : ""}</span>}
           <span className="flex items-center gap-1"><Clock size={13} /> {worker.shifts.map((x) => shiftLabel(x, lang)).join(", ")}</span>
         </div>
       </section>
@@ -84,6 +88,10 @@ export default async function WorkerHome() {
           )}
         </div>
       )}
+
+      <div className="card mt-4 py-3">
+        <LocationBar lang={lang} label={loc?.label ?? null} areas={AREAS} compact />
+      </div>
 
       <div className="mt-7 mb-3 flex items-end justify-between">
         <h2 className="h2">{t(lang, "matchedJobs")}</h2>

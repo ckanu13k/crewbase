@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AREAS } from "@/lib/geo";
 import { getLang, getSession } from "@/lib/session";
 import { isDemo } from "@/lib/db";
 import { Shell } from "@/components/Shell";
@@ -13,7 +14,7 @@ export default async function OnboardPage() {
   }
   return (
     <Shell lang={lang} back="/onboard">
-      <ChatOnboarding lang={lang} smsNumber={process.env.NEXT_PUBLIC_SMS_NUMBER ?? null} voiceNumber={process.env.NEXT_PUBLIC_VOICE_NUMBER ?? null} />
+      <ChatOnboarding lang={lang} areas={AREAS} smsNumber={process.env.NEXT_PUBLIC_SMS_NUMBER ?? null} voiceNumber={process.env.NEXT_PUBLIC_VOICE_NUMBER ?? null} />
     </Shell>
   );
 }

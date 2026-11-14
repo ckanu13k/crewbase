@@ -23,6 +23,7 @@ export const employerNav: Nav = [
 ];
 export const staffNav: Nav = [
   { href: "/recruiter", label: "Dashboard", icon: "dashboard" },
+  { href: "/recruiter/optimize", label: "Optimizer", icon: "optimize" },
   { href: "/recruiter/review", label: "Review", icon: "review" },
   { href: "/recruiter/workers", label: "Workers", icon: "workers" },
   { href: "/recruiter/placements", label: "Placements", icon: "placements" },

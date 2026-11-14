@@ -4,7 +4,9 @@ import { Shell, workerNav } from "@/components/Shell";
 import { TRADES, skillsForTrade } from "@/lib/taxonomy";
 import { shiftLabel } from "@/lib/training";
 import { updateProfile } from "@/app/actions";
-import { zipToPoint } from "@/lib/geo";
+import { AREAS, zipToPoint } from "@/lib/geo";
+import { LocationBar } from "@/components/LocationBar";
+import { getUserLocation } from "@/lib/location";
 
 export default async function Profile() {
   const s = await requireWorker();
@@ -13,10 +15,12 @@ export default async function Profile() {
   const w = await (await db()).table("workers").get(s.workerId);
   if (!w) return null;
   const skills = skillsForTrade(w.trade);
+  const loc = await getUserLocation(w);
 
   return (
     <Shell lang={lang} nav={workerNav(lang)} back="/me/profile">
       <h1 className="h1 mb-4">{es ? "Tu perfil" : "Your profile"}</h1>
+      <LocationBar lang={lang} label={loc?.label ?? null} areas={AREAS} />
       <form action={updateProfile} className="card space-y-4">
         <div>
           <label className="label">{es ? "Nombre" : "Name"}</label>
@@ -42,7 +46,7 @@ export default async function Profile() {
           <div>
             <label className="label">ZIP</label>
             <input name="zip" defaultValue={w.zip ?? ""} inputMode="numeric" pattern="\d{5}" className="input" />
-            {w.zip && !zipToPoint(w.zip) && <p className="mt-1 text-xs text-amber-700">{es ? "ZIP fuera del mapa del demo" : "ZIP not on the demo map"}</p>}
+            {w.zip && !zipToPoint(w.zip) && <p className="mt-1 text-xs text-amber-700">{es ? "Todavía no tenemos ese ZIP en el mapa" : "That ZIP isn't on our map yet"}</p>}
           </div>
           <div>
             <label className="label">{es ? "Distancia máxima" : "Max distance"}</label>

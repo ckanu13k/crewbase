@@ -20,13 +20,13 @@ Demo mode uses fictional sample workers, employers, jobs and training programs (
 
 ## Go live (Vercel + Supabase)
 
-1. **Supabase**: create a project. In the SQL editor run `supabase/migrations/0001_init.sql`, then `0002_rate_limits.sql`.
+1. **Supabase**: create a project. In the SQL editor run `supabase/migrations/0001_init.sql`, `0002_rate_limits.sql`, then `0003_locations.sql` (or all at once: `supabase/setup.sql`). Optional demo board: run `supabase/demo-data.sql` (25 fictional workers, 6 employers, 11 jobs, 10 training programs; regenerate with `npm run demo:sql`). Demo phone numbers are in the reserved 555-01xx range and are never texted.
    - Auth → Providers → **Email**: on. Auth → Email templates → **Magic link**: include `{{ .Token }}` so people get a 6-digit code (the sign-in screen asks for a code, not a link).
    - Auth → Providers → **Phone**: on, provider **Twilio Verify** (no A2P 10DLC needed for Verify codes).
    - Auth → URL configuration: set the Site URL to your Vercel URL.
 2. **Vercel**: import the GitHub repo and set env vars from `.env.example`. At minimum: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `STAFF_EMAILS`, `APP_URL`, `CRON_SECRET`. Demo mode turns off as soon as the Supabase vars are present. Check `/api/health` after each deploy.
 3. **Training data**: download the TWC Statewide ETPL CSV, check the column names in `scripts/etpl-mapping.json`, then `npm run import:etpl -- etpl.csv` with the Supabase env vars set. ETPL has no class dates; add them in **Recruiter → Training**, where you can also add programs by hand.
-4. **ZIP map**: `npm run import:zcta -- 2024_Gaz_zcta_national.txt` (Census Gazetteer), commit `data/zcta.json`, redeploy.
+4. **ZIP map**: `data/zcta.json` ships with Census 2024 Gazetteer centroids for all 77xxx ZIPs (Houston, Golden Triangle, Brazos Valley, Victoria). For more of Texas: `npm run import:zcta -- 2024_Gaz_zcta_national.txt`, commit, redeploy.
 5. **Twilio**: register **A2P 10DLC** (brand + campaign) before texting job matches; approval can take weeks. Point the number's Messaging webhook to `POST {APP_URL}/api/twilio/sms` and Voice webhook to `POST {APP_URL}/api/twilio/voice`. Add a WhatsApp sender with the same messaging webhook if you want WhatsApp. Turn on Advanced Opt-Out; the app also handles STOP/START/HELP.
 6. **Claude**: set `ANTHROPIC_API_KEY`. Default model is `claude-haiku-5-5`; change with `ANTHROPIC_MODEL`.
 7. **Stripe**: set `STRIPE_SECRET_KEY`. "Create invoice" on a day-30-confirmed placement creates, finalizes and emails a net-15 invoice.
@@ -40,6 +40,8 @@ Sign-in: workers use their phone (one-time code); employers and staff use email 
 | --- | --- |
 | Taxonomy (trades, skills, cards, validity) | `lib/taxonomy.ts` |
 | Matching + gaps (pure, tested) | `lib/matching.ts`, `lib/training.ts`, `lib/matching.test.ts` |
+| Assignment optimizer (min-cost flow, tested vs brute force) | `lib/optimizer.ts`, `lib/optimizer.test.ts`, `lib/plan.ts`, `app/recruiter/optimize` |
+| Location (ZIP centroids, device location, area picker) | `lib/geo.ts`, `lib/location.ts`, `app/api/location`, `components/LocationBar.tsx` |
 | Onboarding conversation (all channels) | `lib/onboarding/engine.ts`, `engine.test.ts` |
 | Claude calls (structured outputs, with fallbacks) | `lib/ai/*` |
 | Twilio webhooks | `app/api/twilio/sms`, `app/api/twilio/voice`, `lib/messaging.ts` |
@@ -49,6 +51,13 @@ Sign-in: workers use their phone (one-time code); employers and staff use email 
 | Recruiter console | `app/recruiter/*`, `app/actions.ts` |
 | Placement invoices | `lib/billing.ts` |
 | Session refresh, rate limits, health | `proxy.ts`, `lib/ratelimit.ts`, `app/api/health` |
+
+## Matching and location
+
+- **Location**: workers set it during signup (ZIP or "Use my location"), on their profile, or from the home screen. Visitors pick it on Training (stored in a cookie). Device coordinates are rounded to about half a mile; employers only see distances. Distance uses the exact point when known, else the ZIP centroid.
+- **Hard rules** (`evaluateMatch`): required cards valid on the start date, travel radius, shift, NCCER level, experience (more than a year short), and trade (cross-trade only with at least half the job's skills; anyone can be a helper). Everything else is scored 0–100.
+- **Optimizer** (Recruiter → Optimizer): all open jobs solved at once as a min-cost flow. It fills the most openings first, then maximizes total score; pairs under 60 aren't proposed. Every assignment is re-checked against the rules, and the page compares the result with job-by-job ranking. 2,000 workers × 200 jobs solves in well under a second.
+- **Training**: ranked for wherever the user is by how many open positions nearby ask for what the program gives (required or preferred cards, NCCER level, skills), so the list moves when employers change requirements. Staff keep each program's "What employers ask for now" note current in Recruiter → Training; saving marks it reviewed, and programs unreviewed for 90 days are flagged.
 
 ## Pricing defaults
 

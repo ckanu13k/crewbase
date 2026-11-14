@@ -13,6 +13,8 @@ export interface Worker {
   name: string;
   lang: Lang;
   zip: string | null;
+  lat?: number | null; // from the device's location, if the worker shared it
+  lng?: number | null;
   radiusMiles: number; // 0 = any distance
   shifts: Shift[];
   trade: string | null; // TradeId
@@ -68,6 +70,8 @@ export interface Job {
   payMax: number;
   shift: Shift;
   zip: string;
+  lat?: number | null; // exact site, if known; otherwise the ZIP centroid is used
+  lng?: number | null;
   startDate: string; // YYYY-MM-DD
   headcount: number;
   placementFee: number; // $ per hire
@@ -125,6 +129,8 @@ export interface TrainingProgram {
   nccerLevel: number | null; // level this program completes
   city: string;
   zip: string;
+  lat?: number | null;
+  lng?: number | null;
   nextStart: string | null;
   weeks: number | null;
   clockHours: number | null;
@@ -133,6 +139,10 @@ export interface TrainingProgram {
   languages: Lang[];
   url: string | null;
   sample: boolean; // true = demo data, not a real program
+  /** What employers currently ask for, in plain words. Staff update this when requirements change. */
+  requirementNote?: string | null;
+  /** Date staff last checked the requirements and dates against the provider and local employers. */
+  reviewedOn?: string | null;
 }
 
 export interface OnboardingSession {

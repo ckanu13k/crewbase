@@ -3,7 +3,7 @@
 // Design rule from the product plan: gaps are computed by RULES here. The LLM only rewords
 // them for the worker (lib/ai/explain.ts), so it can never invent a job requirement.
 
-import { zipDistance } from "./geo";
+import { distanceMiles } from "./geo";
 import type { Credential, Job, Verification, Worker } from "./types";
 
 export const EXPIRING_SOON_DAYS = 60;
@@ -131,7 +131,10 @@ export function evaluateMatch(worker: Worker, creds: Credential[], job: Job, tod
   let trade = 8;
   if (worker.trade !== job.trade) {
     trade = 0;
-    gaps.push({ kind: "trade", blocking: false, have: worker.trade, need: job.trade });
+    // Someone from another trade qualifies only if they already have at least half the job's skills
+    // (a welder who fits pipe can take a fitter job; an electrician can't). Anyone can be a helper.
+    const crossesOver = job.trade === "helper" || (job.requiredSkills.length > 0 && matchedSkills.length * 2 >= job.requiredSkills.length);
+    gaps.push({ kind: "trade", blocking: !crossesOver, have: worker.trade, need: job.trade });
   }
 
   // --- Shift ---
@@ -140,7 +143,7 @@ export function evaluateMatch(worker: Worker, creds: Credential[], job: Job, tod
   }
 
   // --- Distance ---
-  const miles = zipDistance(worker.zip, job.zip);
+  const miles = distanceMiles(worker, job);
   let distance = 5; // unknown distance: neutral
   if (miles !== null) {
     const limit = worker.radiusMiles > 0 ? worker.radiusMiles : 75;

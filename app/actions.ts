@@ -89,6 +89,8 @@ export async function updateProfile(form: FormData) {
     yearsExperience: str(form, "years") === "" ? null : Math.max(0, Number(str(form, "years"))),
     nccerLevel: Math.max(0, Math.min(4, Number(str(form, "nccer") || 0))),
     zip: /^\d{5}$/.test(str(form, "zip")) ? str(form, "zip") : w.zip,
+    // A typed ZIP replaces any device location; keeping both would make them disagree.
+    ...(/^\d{5}$/.test(str(form, "zip")) && str(form, "zip") !== w.zip ? { lat: null, lng: null } : {}),
     radiusMiles: Number(str(form, "radius") || w.radiusMiles),
     shifts: form.getAll("shifts").map(String) as Shift[],
     skills: form.getAll("skills").map(String),
@@ -336,6 +338,9 @@ export async function saveProgram(form: FormData) {
     languages: (form.getAll("languages").map(String) as TrainingProgram["languages"]).filter(Boolean),
     url: str(form, "url") || null,
     sample: existing?.sample ?? false,
+    requirementNote: str(form, "requirementNote") || null,
+    // Saving is the review: whoever edits the program has just checked it.
+    reviewedOn: todayISO(),
   });
   revalidatePath("/recruiter/training");
   revalidatePath("/training");
@@ -347,4 +352,20 @@ export async function deleteProgram(form: FormData) {
   await store.table("training_programs").remove(str(form, "id"));
   revalidatePath("/recruiter/training");
   revalidatePath("/training");
+}
+
+/** Shortlist the optimizer's plan (one job, or all of it). The plan is recomputed here, never taken from the form. */
+export async function shortlistPlan(form: FormData) {
+  await staff();
+  const { buildPlan } = await import("@/lib/plan");
+  const { store, result, matches } = await buildPlan();
+  const only = str(form, "jobId");
+  const have = new Set(matches.map((m) => `${m.jobId}:${m.workerId}`));
+  for (const a of result.assignments) {
+    if (only && a.jobId !== only) continue;
+    if (have.has(`${a.jobId}:${a.workerId}`)) continue;
+    await store.table("matches").upsert({ id: newId(), jobId: a.jobId, workerId: a.workerId, stage: "shortlisted", score: a.score, notes: "From optimizer plan", createdAt: nowISO(), updatedAt: nowISO() });
+  }
+  revalidatePath("/recruiter/optimize");
+  revalidatePath("/recruiter");
 }

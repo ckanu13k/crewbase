@@ -1,7 +1,8 @@
 // Links "what you're missing" gaps to training programs, and words gaps in plain EN/ES.
 
 import { credLabel, skillLabel, tradeLabel } from "./taxonomy";
-import type { Funding, Lang, TrainingProgram } from "./types";
+import type { Funding, Job, Lang, TrainingProgram } from "./types";
+import { distanceMiles, type Point } from "./geo";
 import { trainableGaps, type Gap } from "./matching";
 
 export const FUNDING_LABEL: Record<Funding, Record<Lang, string>> = {
@@ -82,4 +83,76 @@ export function shiftLabel(s: string, lang: Lang): string {
 export function money(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Location-aware "top trainings": rank programs by how many open job openings near the user they
+// help unlock, then by distance and how soon they start. Because this reads the live job board,
+// the ranking changes on its own when employers change what they require.
+
+export interface RankedProgram {
+  program: TrainingProgram;
+  miles: number | null;
+  /** Open positions within the search radius that ask for something this program gives. */
+  openingsUnlocked: number;
+  jobsUnlocked: string[];
+  /** For a signed-in worker: blocking gaps on nearby jobs this program would close. */
+  closesMyGaps: number;
+  /** Inside the search radius (or location unknown). Farther programs are listed after, still useful. */
+  inRange: boolean;
+}
+
+/** Does this program supply something the job asks for (a required or preferred card, the NCCER level, or at least half its skills)? */
+export function programServesJob(p: TrainingProgram, job: Job): boolean {
+  if (p.trade && p.trade !== job.trade && ![...job.requiredCredentials, ...job.preferredCredentials].some((c) => p.coversCredentials.includes(c))) return false;
+  const gives = (c: string) => p.coversCredentials.includes(c) || (c === "osha10" && p.coversCredentials.includes("osha30"));
+  if (job.requiredCredentials.some(gives) || job.preferredCredentials.some(gives)) return true;
+  if (job.minNccerLevel > 0 && p.nccerLevel !== null && p.trade === job.trade && p.nccerLevel >= job.minNccerLevel) return true;
+  const skillHits = job.requiredSkills.filter((s) => p.coversSkills.includes(s)).length;
+  return job.requiredSkills.length > 0 && skillHits * 2 >= job.requiredSkills.length;
+}
+
+export function rankTrainingNear(opts: {
+  programs: TrainingProgram[];
+  jobs: Job[];
+  from: Point | null;
+  radiusMiles: number; // jobs and programs farther than this are ignored (0 = anywhere)
+  today: string;
+  myGaps?: Gap[]; // blocking gaps from nearby jobs, for a signed-in worker
+}): RankedProgram[] {
+  const { programs, jobs, from, radiusMiles, today } = opts;
+  const within = (m: number | null) => radiusMiles === 0 || m === null || m <= radiusMiles;
+  const nearbyJobs = jobs.filter((j) => j.status === "open" && within(from ? distanceMiles({ lat: from[0], lng: from[1] }, j) : null));
+  const gaps = trainableGaps(opts.myGaps ?? []);
+
+  const ranked = programs.map((program) => {
+    const miles = from ? distanceMiles({ lat: from[0], lng: from[1] }, program) : null;
+    const served = nearbyJobs.filter((j) => programServesJob(program, j));
+    return {
+      program,
+      miles: miles === null ? null : Math.round(miles * 10) / 10,
+      openingsUnlocked: served.reduce((a, j) => a + j.headcount, 0),
+      jobsUnlocked: served.map((j) => j.id),
+      closesMyGaps: gaps.filter((g) => programCovers(program, g)).length,
+      inRange: within(miles),
+    };
+  });
+  const startKey = (p: TrainingProgram) => (p.nextStart && p.nextStart >= today ? p.nextStart : "9999-12-31");
+  return ranked
+    .filter((r) => r.inRange || r.closesMyGaps > 0 || r.openingsUnlocked > 0)
+    .sort(
+      (a, b) =>
+        b.closesMyGaps - a.closesMyGaps ||
+        Number(b.inRange) - Number(a.inRange) ||
+        b.openingsUnlocked - a.openingsUnlocked ||
+        (a.miles ?? 999) - (b.miles ?? 999) ||
+        startKey(a.program).localeCompare(startKey(b.program)),
+    );
+}
+
+/** Programs whose requirement notes haven't been checked in this many days get flagged for staff. */
+export const REVIEW_EVERY_DAYS = 90;
+export function needsReview(p: TrainingProgram, today: string): boolean {
+  if (!p.reviewedOn) return true;
+  return (Date.parse(today) - Date.parse(p.reviewedOn)) / 86_400_000 > REVIEW_EVERY_DAYS;
 }

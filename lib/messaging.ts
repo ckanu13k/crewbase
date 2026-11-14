@@ -9,10 +9,13 @@ export const twilioConfigured = () =>
  * Sends an SMS (or WhatsApp) message. Without Twilio credentials the message is only logged to the
  * outbox as "simulated", which is what the demo's Outbox screen shows.
  */
+/** 555-0100…0199 numbers are reserved for fiction; demo people use them and are never really texted. */
+export const isFictionalNumber = (to: string) => /^\+1\d{3}55501\d{2}$/.test(to);
+
 export async function sendSms(to: string, body: string, channel: "sms" | "whatsapp" = "sms"): Promise<OutboxMessage> {
   const store = await db();
   const msg: OutboxMessage = { id: newId(), to, body, channel, status: "simulated", providerId: null, createdAt: nowISO() };
-  if (twilioConfigured()) {
+  if (twilioConfigured() && !isFictionalNumber(to)) {
     try {
       const { default: twilio } = await import("twilio");
       const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);

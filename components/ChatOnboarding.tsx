@@ -3,10 +3,11 @@
 // exactly what a worker gets by text.
 import { useEffect, useRef, useState } from "react";
 import type { Lang } from "@/lib/types";
+import { LocationBar } from "./LocationBar";
 
 type Msg = { from: "us" | "them"; text: string; image?: string };
 
-export function ChatOnboarding({ lang: initialLang, smsNumber, voiceNumber }: { lang: Lang; smsNumber: string | null; voiceNumber: string | null }) {
+export function ChatOnboarding({ lang: initialLang, smsNumber, voiceNumber, areas = [] }: { lang: Lang; smsNumber: string | null; voiceNumber: string | null; areas?: { label: string; zip: string }[] }) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
@@ -107,6 +108,11 @@ export function ChatOnboarding({ lang: initialLang, smsNumber, voiceNumber }: { 
             <a href="/me" className="btn-primary w-full">{es ? "Ver mis trabajos y tarjetas" : "See my jobs and cards"} →</a>
           ) : (
             <>
+              {step === "zip" && (
+                <div className="mb-2.5 rounded-xl bg-slate-50 p-2.5">
+                  <LocationBar lang={lang} label={null} areas={areas} compact onPicked={(z) => void send(z)} />
+                </div>
+              )}
               {quick[step] && (
                 <div className="mb-2.5 flex flex-wrap gap-2">
                   {quick[step].map((q) => (
