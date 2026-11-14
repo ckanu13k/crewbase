@@ -1,0 +1,13 @@
+{
+  "_comment": "Column names in the TWC Statewide ETPL CSV. Open the file and adjust these to match its header row before importing.",
+  "provider": "Provider Name",
+  "name": "Program Name",
+  "city": "Program City",
+  "zip": "Program Zip",
+  "cost": "Total Cost",
+  "clockHours": "Program Length Hours",
+  "weeks": "Program Length Weeks",
+  "url": "Program URL",
+  "board": "Workforce Board",
+  "filterBoard": "Gulf Coast"
+}
