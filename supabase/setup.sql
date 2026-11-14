@@ -208,3 +208,9 @@ end;
 $$;
 
 revoke all on function rate_limit_hit(text, int, int) from public, anon, authenticated;
+grant execute on function rate_limit_hit(text, int, int) to service_role;
+
+-- Server access (service role) to every app table, whatever the project's auto-expose setting.
+grant usage on schema public to service_role;
+grant all on all tables in schema public to service_role;
+grant select on training_programs to anon, authenticated;
