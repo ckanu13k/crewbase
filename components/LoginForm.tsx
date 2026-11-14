@@ -16,7 +16,7 @@ export function LoginForm({ lang, mode: initial, supabaseUrl, anonKey }: { lang:
 
   async function sendCode() {
     setErr("");
-    const { error } = mode === "phone" ? await supabase.auth.signInWithOtp({ phone: phone() }) : await supabase.auth.signInWithOtp({ email: id, options: { shouldCreateUser: true } });
+    const { error } = mode === "phone" ? await supabase.auth.signInWithOtp({ phone: phone() }) : await supabase.auth.signInWithOtp({ email: id, options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/auth/callback` } });
     if (error) setErr(error.message); else setSent(true);
   }
   async function verify() {
@@ -41,6 +41,7 @@ export function LoginForm({ lang, mode: initial, supabaseUrl, anonKey }: { lang:
       <input className="input" value={id} onChange={(e) => setId(e.target.value)} placeholder={mode === "phone" ? "713 555 0100" : "you@company.com"} inputMode={mode === "phone" ? "tel" : "email"} />
       {sent && <input className="input" value={code} onChange={(e) => setCode(e.target.value)} placeholder={es ? "Código" : "Code"} inputMode="numeric" autoFocus />}
       <button className="btn-primary w-full" onClick={sent ? verify : sendCode}>{sent ? (es ? "Entrar" : "Sign in") : es ? "Mandar código" : "Send code"}</button>
+      {sent && mode === "email" && <p className="text-sm text-stone-600">{es ? "Revisa tu correo: abre el enlace o escribe el código." : "Check your email: open the link, or type the code if there is one."}</p>}
       {err && <p className="text-sm font-semibold text-red-700">{err}</p>}
     </div>
   );
