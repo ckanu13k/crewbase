@@ -56,9 +56,9 @@ export default async function EmployerJob({ params, searchParams }: { params: Pr
                   );
                 })}
               </div>
-              <p className="mt-2 text-sm text-stone-600">{worker.summary}</p>
+              <p className="mt-2 text-sm text-slate-600">{worker.summary}</p>
               <div className="mt-3 flex items-center gap-2">
-                <span className="pill bg-stone-100">{m.stage}</span>
+                <span className="pill bg-slate-100">{m.stage}</span>
                 {m.stage === "sent" && (
                   <>
                     <form action={employerRespond}><input type="hidden" name="matchId" value={m.id} /><input type="hidden" name="stage" value="interview" /><button className="btn-primary btn-sm">Request interview</button></form>

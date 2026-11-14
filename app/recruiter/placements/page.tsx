@@ -7,7 +7,7 @@ import type { PlacementStatus } from "@/lib/types";
 
 const STYLE: Record<PlacementStatus, string> = {
   active: "bg-sky-100 text-sky-800", day30_confirmed: "bg-amber-100 text-amber-900", invoiced: "bg-violet-100 text-violet-800",
-  paid: "bg-emerald-100 text-emerald-800", left_early: "bg-red-100 text-red-800", replaced: "bg-stone-200",
+  paid: "bg-emerald-100 text-emerald-800", left_early: "bg-red-100 text-red-800", replaced: "bg-slate-200",
 };
 
 export default async function Placements() {
@@ -56,7 +56,7 @@ export default async function Placements() {
                 <td>{money(p.fee)}</td>
                 <td>
                   <span className={`pill ${STYLE[p.status]}`}>{p.status.replace("_", " ")}</span>
-                  {p.invoiceId && <div className="mt-1 text-xs text-stone-500">{p.invoiceUrl ? <a href={p.invoiceUrl} className="underline" target="_blank" rel="noreferrer">{p.invoiceId}</a> : p.invoiceId}</div>}
+                  {p.invoiceId && <div className="mt-1 text-xs text-slate-500">{p.invoiceUrl ? <a href={p.invoiceUrl} className="underline" target="_blank" rel="noreferrer">{p.invoiceId}</a> : p.invoiceId}</div>}
                 </td>
                 <td>
                   <div className="flex flex-wrap gap-1">

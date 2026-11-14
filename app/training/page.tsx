@@ -40,7 +40,7 @@ export default async function Training({ searchParams }: { searchParams: Promise
         <label className="flex items-center gap-2 px-2 text-sm">
           <input type="checkbox" name="es" value="1" defaultChecked={Boolean(sp.es)} /> {t(lang, "spanishOnly")}
         </label>
-        <button className="btn-dark">{es ? "Filtrar" : "Filter"}</button>
+        <button className="btn-primary">{es ? "Filtrar" : "Filter"}</button>
       </form>
 
       <div className="space-y-2">
@@ -51,7 +51,7 @@ export default async function Training({ searchParams }: { searchParams: Promise
                 <div className="font-bold">{p.name}</div>
                 <div className="muted">{p.provider} · {p.city}</div>
               </div>
-              {p.sample && <span className="pill bg-amber-100 text-amber-800">{t(lang, "sampleData")}</span>}
+              {p.sample && <span className="pill bg-slate-100 text-slate-500">{t(lang, "sampleData")}</span>}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-1 text-sm sm:grid-cols-4">
               <div><b>{t(lang, "starts")}:</b> {p.nextStart ?? "—"}</div>
@@ -60,12 +60,12 @@ export default async function Training({ searchParams }: { searchParams: Promise
               <div><b>{es ? "Idioma" : "Language"}:</b> {p.languages.map((l) => l.toUpperCase()).join(" / ")}</div>
             </div>
             {(p.coversCredentials.length > 0 || p.coversSkills.length > 0) && (
-              <div className="mt-2 text-xs text-stone-600">
+              <div className="mt-2 text-xs text-slate-600">
                 {es ? "Te da: " : "Gets you: "}
                 {[...p.coversCredentials.map(credShort), ...p.coversSkills.map((s) => skillLabel(s, lang)), ...(p.nccerLevel ? [`NCCER ${p.nccerLevel}`] : [])].join(" · ")}
               </div>
             )}
-            <div className="mt-2 flex flex-wrap gap-1">{p.funding.map((f) => <span key={f} className="pill bg-emerald-50 text-emerald-800">{FUNDING_LABEL[f][lang]}</span>)}</div>
+            <div className="mt-2 flex flex-wrap gap-1">{p.funding.map((f) => <span key={f} className="pill bg-blue-50 text-blue-700 ring-1 ring-blue-200">{FUNDING_LABEL[f][lang]}</span>)}</div>
             {p.url && <a href={p.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm text-brand-dark underline">{es ? "Más información" : "More info"}</a>}
           </div>
         ))}

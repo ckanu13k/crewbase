@@ -29,7 +29,7 @@ export default async function Workers({ searchParams }: { searchParams: Promise<
           <option value="">All trades</option>
           {TRADES.map((t) => <option key={t.id} value={t.id}>{t.label.en}</option>)}
         </select>
-        <button className="btn-dark">Search</button>
+        <button className="btn-primary">Search</button>
       </form>
       <div className="card overflow-x-auto">
         <table className="data">
@@ -39,7 +39,7 @@ export default async function Workers({ searchParams }: { searchParams: Promise<
               const cs = byWorker[w.id] ?? [];
               return (
                 <tr key={w.id}>
-                  <td><Link className="font-semibold underline" href={`/recruiter/workers/${w.id}`}>{w.name || "(no name yet)"}</Link><div className="muted">{w.phone} · {w.lang.toUpperCase()}</div></td>
+                  <td><Link className="font-semibold text-brand hover:text-brand-dark" href={`/recruiter/workers/${w.id}`}>{w.name || "(no name yet)"}</Link><div className="muted">{w.phone} · {w.lang.toUpperCase()}</div></td>
                   <td>{tradeLabel(w.trade, "en")}</td>
                   <td>{w.yearsExperience ?? "?"} / {w.nccerLevel || "—"}</td>
                   <td>{w.zip ?? "—"}</td>
@@ -47,7 +47,7 @@ export default async function Workers({ searchParams }: { searchParams: Promise<
                     {cs.filter((c) => c.verification === "verified").length} verified · {cs.length} total
                     {cs.some((c) => credentialStatus(c, today) === "expired") && <span className="pill ml-1 bg-red-100 text-red-800">expired</span>}
                   </td>
-                  <td>{w.onboardingComplete ? <span className="pill bg-emerald-100 text-emerald-800">active</span> : <span className="pill bg-amber-100 text-amber-800">mid-signup</span>}{!w.consentSms && <span className="pill ml-1 bg-stone-200">opted out</span>}</td>
+                  <td>{w.onboardingComplete ? <span className="pill bg-emerald-100 text-emerald-800">active</span> : <span className="pill bg-amber-100 text-amber-800">mid-signup</span>}{!w.consentSms && <span className="pill ml-1 bg-slate-200">opted out</span>}</td>
                 </tr>
               );
             })}

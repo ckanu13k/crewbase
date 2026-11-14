@@ -55,7 +55,7 @@ export default async function Profile() {
           <legend className="label">{es ? "Turnos" : "Shifts"}</legend>
           <div className="flex flex-wrap gap-2">
             {(["day", "night", "rotating", "turnaround"] as const).map((x) => (
-              <label key={x} className="flex items-center gap-2 rounded-lg border border-stone-300 px-3 py-2">
+              <label key={x} className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2">
                 <input type="checkbox" name="shifts" value={x} defaultChecked={w.shifts.includes(x)} /> {shiftLabel(x, lang)}
               </label>
             ))}
@@ -70,7 +70,7 @@ export default async function Profile() {
               </label>
             ))}
           </div>
-          <p className="mt-1 text-xs text-stone-500">{es ? "Cambia tu oficio y guarda para ver sus habilidades." : "Change your trade and save to see its skills."}</p>
+          <p className="mt-1 text-xs text-slate-500">{es ? "Cambia tu oficio y guarda para ver sus habilidades." : "Change your trade and save to see its skills."}</p>
         </fieldset>
         <div>
           <label className="label">{es ? "Idioma" : "Language"}</label>

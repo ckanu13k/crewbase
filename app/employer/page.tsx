@@ -40,9 +40,9 @@ export default async function EmployerHome() {
               const fit = rankCandidates(workers.filter((w) => w.onboardingComplete), byWorker, j, today).filter((r) => r.result.eligible).length;
               return (
                 <tr key={j.id}>
-                  <td><Link className="font-semibold underline" href={`/employer/jobs/${j.id}`}>{j.title}</Link><div className="muted">{tradeLabel(j.trade, "en")} · ${j.payMin}–{j.payMax}/hr · {j.headcount} opening(s)</div></td>
+                  <td><Link className="font-semibold text-brand hover:text-brand-dark" href={`/employer/jobs/${j.id}`}>{j.title}</Link><div className="muted">{tradeLabel(j.trade, "en")} · ${j.payMin}–{j.payMax}/hr · {j.headcount} opening(s)</div></td>
                   <td>{j.startDate}</td>
-                  <td><span className={`pill ${j.status === "open" ? "bg-emerald-100 text-emerald-800" : "bg-stone-200"}`}>{j.status}</span></td>
+                  <td><span className={`pill ${j.status === "open" ? "bg-emerald-100 text-emerald-800" : "bg-slate-200"}`}>{j.status}</span></td>
                   <td>{fit}</td>
                   <td>{ms.filter((m) => ["sent", "interview", "hired"].includes(m.stage)).length}</td>
                   <td>{ms.filter((m) => m.stage === "interview").length}</td>

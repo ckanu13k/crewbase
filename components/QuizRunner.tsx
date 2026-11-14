@@ -30,10 +30,10 @@ export function QuizRunner({ quiz, lang }: { quiz: Quiz; lang: Lang }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h1 className="text-sm font-semibold text-stone-500">{quiz.title[lang]}</h1>
+        <h1 className="text-sm font-semibold text-slate-500">{quiz.title[lang]}</h1>
         <span className="muted">{i + 1}/{quiz.questions.length}</span>
       </div>
-      <div className="mb-4 h-1.5 overflow-hidden rounded bg-stone-200">
+      <div className="mb-4 h-1.5 overflow-hidden rounded bg-slate-200">
         <div className="h-full bg-brand transition-all" style={{ width: `${(i / quiz.questions.length) * 100}%` }} />
       </div>
       <div className="card">
@@ -52,7 +52,7 @@ export function QuizRunner({ quiz, lang }: { quiz: Quiz; lang: Lang }) {
         {picked !== null && (
           <div className="mt-4">
             <p className={`font-bold ${picked === q.answer ? "text-emerald-700" : "text-red-700"}`}>{picked === q.answer ? (es ? "Correcto" : "Correct") : es ? "No exactamente" : "Not quite"}</p>
-            <p className="mt-1 text-sm text-stone-700">{q.why[lang]}</p>
+            <p className="mt-1 text-sm text-slate-700">{q.why[lang]}</p>
             <button className="btn-primary mt-3 w-full" onClick={() => { setI(i + 1); setPicked(null); }}>{es ? "Siguiente" : "Next"}</button>
           </div>
         )}

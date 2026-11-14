@@ -36,7 +36,7 @@ export default async function TrainingAdmin({ searchParams }: { searchParams: Pr
                   <td className="text-xs">{[...x.coversCredentials.map(credShort), ...(x.nccerLevel ? [`NCCER ${x.nccerLevel}`] : [])].join(", ") || "—"}{x.coversSkills.length ? ` +${x.coversSkills.length} skills` : ""}</td>
                   <td className="whitespace-nowrap">
                     <Link href={`/recruiter/training?edit=${x.id}`} className="btn-ghost btn-sm">Edit</Link>
-                    <form action={deleteProgram} className="inline"><input type="hidden" name="id" value={x.id} /><button className="btn-sm text-stone-400 hover:text-red-600">✕</button></form>
+                    <form action={deleteProgram} className="inline"><input type="hidden" name="id" value={x.id} /><button className="btn-sm text-slate-400 hover:text-red-600">✕</button></form>
                   </td>
                 </tr>
               ))}

@@ -30,7 +30,7 @@ export default async function Outbox() {
           <div key={m.id} className="card">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <b>{byPhone[m.to] ?? m.to}</b><span className="muted">{m.to}</span>
-              <span className={`pill ${m.status === "sent" ? "bg-emerald-100 text-emerald-800" : m.status === "failed" ? "bg-red-100 text-red-800" : "bg-stone-100"}`}>{m.status}</span>
+              <span className={`pill ${m.status === "sent" ? "bg-emerald-100 text-emerald-800" : m.status === "failed" ? "bg-red-100 text-red-800" : "bg-slate-100"}`}>{m.status}</span>
               <span className="muted ml-auto">{new Date(m.createdAt).toLocaleString("en-US", { timeZone: "America/Chicago" })}</span>
             </div>
             <p className="mt-1 whitespace-pre-wrap text-sm">{m.body}</p>

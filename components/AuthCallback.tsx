@@ -23,5 +23,5 @@ export function AuthCallback({ supabaseUrl, anonKey }: { supabaseUrl: string; an
       window.location.replace(body.role === "worker" ? "/me" : body.role === "employer" ? "/employer" : "/recruiter");
     })();
   }, [supabaseUrl, anonKey]);
-  return <p className="p-8 text-center text-stone-600">{msg}</p>;
+  return <p className="p-8 text-center text-slate-600">{msg}</p>;
 }

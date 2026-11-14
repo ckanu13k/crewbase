@@ -20,13 +20,23 @@ export function AddCardForm({ lang, options }: { lang: Lang; options: { id: stri
       className="space-y-3"
     >
       <div>
-        <label className="label">{es ? "Foto del frente de la tarjeta" : "Photo of the front of the card"}</label>
-        <input name="photo" type="file" accept="image/*" capture="environment" className="input" onChange={(e) => setPreview(e.target.files?.[0] ? URL.createObjectURL(e.target.files[0]) : null)} />
-        {preview && <img src={preview} alt="" className="mt-2 max-h-40 rounded-lg border" />}
-        <p className="mt-1 text-xs text-stone-500">{es ? "Leemos el tipo, número y fechas automáticamente. Puedes corregirlos abajo." : "We read the type, number and dates automatically. You can correct them below."}</p>
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-blue-200 bg-brand-soft/60 px-4 py-6 text-center transition hover:border-brand hover:bg-brand-soft">
+          {preview ? (
+            <img src={preview} alt="" className="max-h-40 rounded-xl shadow-card" />
+          ) : (
+            <>
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-white text-brand shadow-card">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>
+              </span>
+              <span className="font-semibold text-brand-dark">{es ? "Toma o sube una foto" : "Take or upload a photo"}</span>
+              <span className="text-xs text-slate-500">{es ? "Frente de la tarjeta, con buena luz" : "Front of the card, in good light"}</span>
+            </>
+          )}
+          <input name="photo" type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => setPreview(e.target.files?.[0] ? URL.createObjectURL(e.target.files[0]) : null)} />
+        </label>
       </div>
-      <details className="rounded-lg border border-stone-200 p-3">
-        <summary className="cursor-pointer text-sm font-semibold">{es ? "Escribir los datos (opcional)" : "Type the details (optional)"}</summary>
+      <details className="rounded-xl border border-slate-200 p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-brand-dark">{es ? "Escribir los datos (opcional)" : "Type the details (optional)"}</summary>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="label">{es ? "Tipo de tarjeta" : "Card type"}</label>

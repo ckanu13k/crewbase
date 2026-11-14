@@ -1,82 +1,97 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { Languages, LogOut, Sparkles } from "lucide-react";
 import { isDemo } from "@/lib/db";
 import { t } from "@/lib/i18n";
 import type { Lang } from "@/lib/types";
+import { Logo } from "./Logo";
+import { DesktopNav, TabBar, type NavItem } from "./Nav";
 
-type Nav = { href: string; label: string }[];
+type Nav = NavItem[];
 
 export function workerNav(lang: Lang): Nav {
   return [
-    { href: "/me", label: t(lang, "home") },
-    { href: "/me/cards", label: t(lang, "wallet") },
-    { href: "/training", label: t(lang, "training") },
-    { href: "/learn", label: t(lang, "practice") },
+    { href: "/me", label: t(lang, "home"), icon: "home" },
+    { href: "/me/cards", label: t(lang, "wallet"), icon: "wallet" },
+    { href: "/training", label: t(lang, "training"), icon: "training" },
+    { href: "/learn", label: t(lang, "practice"), icon: "practice" },
   ];
 }
 export const employerNav: Nav = [
-  { href: "/employer", label: "Jobs" },
-  { href: "/employer/jobs/new", label: "Post a job" },
+  { href: "/employer", label: "Jobs", icon: "jobs" },
+  { href: "/employer/jobs/new", label: "Post a job", icon: "post" },
 ];
 export const staffNav: Nav = [
-  { href: "/recruiter", label: "Dashboard" },
-  { href: "/recruiter/review", label: "Review" },
-  { href: "/recruiter/workers", label: "Workers" },
-  { href: "/recruiter/placements", label: "Placements" },
-  { href: "/recruiter/employers", label: "Employers" },
-  { href: "/recruiter/training", label: "Training" },
-  { href: "/recruiter/outbox", label: "Texts" },
+  { href: "/recruiter", label: "Dashboard", icon: "dashboard" },
+  { href: "/recruiter/review", label: "Review", icon: "review" },
+  { href: "/recruiter/workers", label: "Workers", icon: "workers" },
+  { href: "/recruiter/placements", label: "Placements", icon: "placements" },
+  { href: "/recruiter/employers", label: "Employers", icon: "employers" },
+  { href: "/recruiter/training", label: "Training", icon: "training" },
+  { href: "/recruiter/outbox", label: "Texts", icon: "texts" },
 ];
 
-export async function Shell({ lang, nav, back, wide, children }: { lang: Lang; nav?: Nav; back?: string; wide?: boolean; children: React.ReactNode }) {
+export async function Shell({ lang, nav, back, wide, bare, children }: { lang: Lang; nav?: Nav; back?: string; wide?: boolean; bare?: boolean; children: React.ReactNode }) {
   const demo = isDemo();
   const signedIn = !demo && Boolean((await cookies()).get("cp_token")?.value);
+  const width = wide ? "max-w-6xl" : "max-w-3xl";
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-20 bg-ink text-white" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className={`mx-auto flex items-center gap-3 px-4 py-3 ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
-          <Link href="/" className="flex items-center gap-2 font-bold">
-            <span className="grid h-7 w-7 place-items-center rounded-md bg-brand text-ink">✓</span>
-            CrewPass
-          </Link>
-          <nav className="ml-2 hidden gap-1 sm:flex">
-            {nav?.map((n) => (
-              <Link key={n.href} href={n.href} className="rounded-md px-2 py-1 text-sm text-stone-300 hover:bg-white/10 hover:text-white">
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <form action="/api/lang" method="post" className="ml-auto">
-            <input type="hidden" name="lang" value={lang === "en" ? "es" : "en"} />
-            <input type="hidden" name="back" value={back ?? "/"} />
-            <button className="rounded-md border border-white/20 px-2 py-1 text-sm hover:bg-white/10">{t(lang, "language")}</button>
-          </form>
-          {demo && (
-            <form action="/api/demo" method="post">
-              <input type="hidden" name="action" value="logout" />
-              <button className="rounded-md px-2 py-1 text-sm text-stone-300 hover:bg-white/10">{t(lang, "signOut")}</button>
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-md" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <div className={`mx-auto flex h-14 items-center gap-2 px-4 ${nav ? "max-w-6xl" : width}`}>
+          <Link href="/" aria-label="CrewPass home"><Logo /></Link>
+          {nav && <DesktopNav items={nav} />}
+          <div className="ml-auto flex items-center gap-1">
+            <form action="/api/lang" method="post">
+              <input type="hidden" name="lang" value={lang === "en" ? "es" : "en"} />
+              <input type="hidden" name="back" value={back ?? "/"} />
+              <button className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-ink">
+                <Languages size={16} /> {t(lang, "language")}
+              </button>
             </form>
-          )}
-          {signedIn && (
-            <form action="/api/auth/logout" method="post">
-              <button className="rounded-md px-2 py-1 text-sm text-stone-300 hover:bg-white/10">{lang === "es" ? "Salir" : "Sign out"}</button>
-            </form>
-          )}
+            {demo && (
+              <form action="/api/demo" method="post">
+                <input type="hidden" name="action" value="logout" />
+                <button className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-ink">{t(lang, "signOut")}</button>
+              </form>
+            )}
+            {signedIn && (
+              <form action="/api/auth/logout" method="post">
+                <button className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-ink">
+                  <LogOut size={16} /> <span className="hidden sm:inline">{lang === "es" ? "Salir" : "Sign out"}</span>
+                </button>
+              </form>
+            )}
+          </div>
         </div>
-        {demo && <div className="bg-amber-300 px-4 py-1 text-center text-xs font-semibold text-ink">{t(lang, "demoBanner")}</div>}
+        {demo && (
+          <div className="flex items-center justify-center gap-1.5 border-t border-blue-100 bg-brand-soft px-4 py-1.5 text-center text-xs font-medium text-brand-dark">
+            <Sparkles size={13} /> {t(lang, "demoBanner")}
+          </div>
+        )}
       </header>
 
-      <main className={`mx-auto w-full flex-1 px-4 py-5 pb-24 sm:pb-8 ${wide ? "max-w-6xl" : "max-w-2xl"}`}>{children}</main>
-
-      {nav && (
-        <nav className="fixed inset-x-0 bottom-0 z-20 flex overflow-x-auto border-t border-stone-200 bg-white sm:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-          {nav.map((n) => (
-            <Link key={n.href} href={n.href} className="min-w-[4.5rem] flex-1 px-2 py-3 text-center text-xs font-semibold whitespace-nowrap text-stone-600 active:bg-stone-100">
-              {n.label}
-            </Link>
-          ))}
-        </nav>
+      {bare ? (
+        <main className="flex-1 pb-24 lg:pb-0">{children}</main>
+      ) : (
+        <main className={`mx-auto w-full flex-1 px-4 py-6 pb-28 lg:pb-10 ${width}`}>{children}</main>
       )}
+
+      {nav && <TabBar items={nav} />}
+    </div>
+  );
+}
+
+/** Page title block used across screens. */
+export function PageHeader({ eyebrow, title, subtitle, action }: { eyebrow?: string; title: React.ReactNode; subtitle?: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
+        <h1 className="h1">{title}</h1>
+        {subtitle && <p className="mt-1 text-[15px] text-slate-500">{subtitle}</p>}
+      </div>
+      {action}
     </div>
   );
 }

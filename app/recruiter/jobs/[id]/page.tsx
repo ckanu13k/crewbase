@@ -35,7 +35,7 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
         <form action={textTopMatches} className="flex items-center gap-2">
           <input type="hidden" name="jobId" value={job.id} />
           <input type="hidden" name="limit" value="10" />
-          <button className="btn-dark btn-sm">Text top 10 eligible workers</button>
+          <button className="btn-primary btn-sm">Text top 10 eligible workers</button>
         </form>
       </div>
 
@@ -49,7 +49,7 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
               const w = data.workers.find((x) => x.id === m.workerId);
               return (
                 <tr key={m.id}>
-                  <td><Link className="font-semibold underline" href={`/recruiter/workers/${m.workerId}`}>{w?.name}</Link><div className="muted">{w?.phone}</div></td>
+                  <td><Link className="font-semibold text-brand hover:text-brand-dark" href={`/recruiter/workers/${m.workerId}`}>{w?.name}</Link><div className="muted">{w?.phone}</div></td>
                   <td>{m.score}</td>
                   <td>
                     {m.stage === "hired" ? (
@@ -64,7 +64,7 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
                       </form>
                     )}
                   </td>
-                  <td className="max-w-xs whitespace-pre-wrap text-xs text-stone-600">{m.notes}</td>
+                  <td className="max-w-xs whitespace-pre-wrap text-xs text-slate-600">{m.notes}</td>
                   <td>
                     {m.stage === "interview" && (
                       <form action={markHired} className="flex gap-1">
@@ -73,7 +73,7 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
                         <button className="btn-primary btn-sm">Hired</button>
                       </form>
                     )}
-                    {m.stage === "hired" && <Link href="/recruiter/placements" className="text-sm underline">Placement →</Link>}
+                    {m.stage === "hired" && <Link href="/recruiter/placements" className="text-sm font-semibold text-brand hover:text-brand-dark">Placement →</Link>}
                   </td>
                 </tr>
               );
@@ -103,17 +103,17 @@ function CandidateTable({ rows, jobId, matchByWorker }: { rows: { worker: Worker
           {rows.map(({ worker, result }) => (
             <tr key={worker.id}>
               <td>
-                <Link className="font-semibold underline" href={`/recruiter/workers/${worker.id}`}>{worker.name}</Link>
+                <Link className="font-semibold text-brand hover:text-brand-dark" href={`/recruiter/workers/${worker.id}`}>{worker.name}</Link>
                 <div className="muted">{tradeLabel(worker.trade, "en")} · {worker.yearsExperience ?? "?"} yrs · NCCER {worker.nccerLevel || "—"} · {result.distanceMiles !== null ? `${Math.round(result.distanceMiles)} mi` : "?"} · {worker.lang.toUpperCase()}</div>
               </td>
               <td><ScorePill score={result.score} eligible={result.eligible} /></td>
-              <td className="text-xs text-stone-500">skills {result.breakdown.skills} · cards {result.breakdown.credentials} · pref {result.breakdown.preferred} · exp {result.breakdown.experience} · dist {result.breakdown.distance} · trade {result.breakdown.trade}</td>
+              <td className="text-xs text-slate-500">skills {result.breakdown.skills} · cards {result.breakdown.credentials} · pref {result.breakdown.preferred} · exp {result.breakdown.experience} · dist {result.breakdown.distance} · trade {result.breakdown.trade}</td>
               <td className="max-w-sm text-xs">
-                {result.gaps.length === 0 ? "—" : result.gaps.map((g, i) => <div key={i} className={g.blocking ? "font-semibold text-red-700" : "text-stone-600"}>{g.blocking ? "⛔ " : "• "}{gapText(g, "en")}</div>)}
+                {result.gaps.length === 0 ? "—" : result.gaps.map((g, i) => <div key={i} className={g.blocking ? "font-semibold text-red-700" : "text-slate-600"}>{g.blocking ? "⛔ " : "• "}{gapText(g, "en")}</div>)}
               </td>
               <td className="whitespace-nowrap">
                 {matchByWorker[worker.id] ? (
-                  <span className="pill bg-stone-100">in pipeline</span>
+                  <span className="pill bg-slate-100">in pipeline</span>
                 ) : (
                   <div className="flex gap-1">
                     <form action={shortlist}>

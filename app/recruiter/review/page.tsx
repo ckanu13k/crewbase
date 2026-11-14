@@ -35,7 +35,7 @@ export default async function Review() {
                 {c.photoPath ? (
                   <a href={`/api/files/${c.photoPath}`} target="_blank" rel="noreferrer"><img src={`/api/files/${c.photoPath}`} alt="" className="w-full rounded-lg border object-contain" /></a>
                 ) : (
-                  <div className="grid h-32 place-items-center rounded-lg border border-dashed text-sm text-stone-400">No photo (self-reported)</div>
+                  <div className="grid h-32 place-items-center rounded-lg border border-dashed text-sm text-slate-400">No photo (self-reported)</div>
                 )}
                 <div className="mt-2 text-sm font-semibold">{w?.name}</div>
                 <div className="muted">{w?.phone}</div>
@@ -44,7 +44,7 @@ export default async function Review() {
                 <div className="flex flex-wrap items-center gap-2">
                   <VerificationBadge c={c} lang="en" />
                   <ExpiryBadge c={c} lang="en" today={today} />
-                  {c.extractionConfidence !== null && <span className="pill bg-stone-100">AI confidence {Math.round(c.extractionConfidence * 100)}%</span>}
+                  {c.extractionConfidence !== null && <span className="pill bg-slate-100">AI confidence {Math.round(c.extractionConfidence * 100)}%</span>}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="sm:col-span-2">
@@ -60,7 +60,7 @@ export default async function Review() {
                   <div><label className="label">Expires</label><input name="expiresOn" type="date" defaultValue={c.expiresOn ?? ""} className="input" /></div>
                   <div className="sm:col-span-2"><label className="label">How you verified it</label><input name="method" placeholder={def?.verifyHow ?? "e.g. issuer lookup"} className="input" /></div>
                 </div>
-                {def && <p className="text-xs text-stone-500"><b>How to verify:</b> {def.verifyHow}</p>}
+                {def && <p className="text-xs text-slate-500"><b>How to verify:</b> {def.verifyHow}</p>}
                 <div className="flex flex-wrap gap-2">
                   <button name="decision" value="verify" className="btn-primary btn-sm">✔ Verified</button>
                   <button name="decision" value="save" className="btn-ghost btn-sm">Save fields only</button>
