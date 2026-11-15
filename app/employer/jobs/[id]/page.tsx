@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { isStaffRole } from "@/lib/permissions";
 import Link from "next/link";
 import { requireEmployer, getLang } from "@/lib/session";
 import { jobCandidates } from "@/lib/queries";
@@ -15,7 +16,7 @@ export default async function EmployerJob({ params, searchParams }: { params: Pr
   const s = await requireEmployer();
   const lang = await getLang();
   const data = await jobCandidates(id);
-  if (!data || (data.job.employerId !== s.employerId && s.role !== "staff")) notFound();
+  if (!data || (data.job.employerId !== s.employerId && !isStaffRole(s.role))) notFound();
   const { job, ranked, matches, credsByWorker, today, screeningsByWorker } = data;
   const kinds = requiredKinds(job);
   const eligible = ranked.filter((r) => r.result.eligible);

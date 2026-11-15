@@ -8,14 +8,15 @@ import {
   ADVERSE_WAIT_BUSINESS_DAYS, FCRA_RIGHTS_URL, KIND_LABEL, billable, businessDaysBetween, canSendFinalNotice, employerLabel,
 } from "@/lib/screening/policy";
 import {
-  cancelScreening, clearAfterReview, invoiceEmployerScreenings, markScreeningOrdered, recordScreeningResult, sendFinalAdverseNotice, sendPreAdverseNotice,
+  cancelScreening, clearAfterReview, markScreeningOrdered, recordScreeningResult, sendFinalAdverseNotice, sendPreAdverseNotice,
 } from "@/app/screening-actions";
 import type { Screening } from "@/lib/types";
+import { can } from "@/lib/permissions";
 
 const ORDER: Screening["status"][] = ["needs_review", "pre_adverse", "in_progress", "awaiting_consent", "clear", "not_cleared", "canceled"];
 
 export default async function ScreeningsAdmin() {
-  await requireRole("staff");
+  const session = await requireRole("staff");
   const lang = await getLang();
   const store = await db();
   const today = todayISO();
@@ -50,19 +51,10 @@ export default async function ScreeningsAdmin() {
         <a href={FCRA_RIGHTS_URL} target="_blank" rel="noreferrer" className="underline">Summary of Rights</a>, wait {ADVERSE_WAIT_BUSINESS_DAYS} business days, then a final notice.
       </div>
 
-      {owed.length > 0 && (
-        <div className="card mb-4">
-          <h2 className="h2 mb-2">Ready to bill</h2>
-          <div className="space-y-2">
-            {owed.map(({ e, rows: r }) => (
-              <form key={e.id} action={invoiceEmployerScreenings} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0" data-testid="screening-bill">
-                <input type="hidden" name="employerId" value={e.id} />
-                <span><b>{e.name}</b> · {r.length} screening(s) · <b>{money(r.reduce((a, x) => a + x.priceUsd, 0))}</b></span>
-                <button className="btn-primary btn-sm">Create invoice</button>
-              </form>
-            ))}
-          </div>
-        </div>
+      {owed.length > 0 && can(session.role, "bill") && (
+        <Link href="/admin/billing" className="mb-4 flex items-center justify-between rounded-xl bg-brand-soft px-4 py-3 text-sm font-semibold text-brand-dark ring-1 ring-blue-200">
+          <span>{owed.reduce((n, x) => n + x.rows.length, 0)} screening(s) ready to bill</span><span>Admin → Billing →</span>
+        </Link>
       )}
 
       <div className="card overflow-x-auto">

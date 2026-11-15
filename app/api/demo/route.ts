@@ -1,6 +1,7 @@
 // Demo-only sign-in (no passwords) and reset. Disabled when Supabase is configured.
 import { NextResponse } from "next/server";
 import { isDemo } from "@/lib/db";
+import { HOME, normalizeRole } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   if (!isDemo()) return new NextResponse("Not found", { status: 404 });
@@ -21,8 +22,9 @@ export async function POST(req: Request) {
     return res;
   }
 
-  const role = String(form.get("role"));
-  const target = role === "worker" ? "/me" : role === "employer" ? "/employer" : "/recruiter";
+  const role = normalizeRole(String(form.get("role")));
+  if (!role) return new NextResponse("Bad role", { status: 400 });
+  const target = HOME[role];
   const res = NextResponse.redirect(new URL(target, req.url), 303);
   res.cookies.set("cp_role", role, opts);
   if (role === "worker") {

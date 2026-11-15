@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db, newId, nowISO, todayISO } from "@/lib/db";
-import { requireRole, requireWorker } from "@/lib/session";
+import { requireCap, requireRole, requireWorker } from "@/lib/session";
 import { sendSms } from "@/lib/messaging";
 import { appUrl } from "@/lib/onboarding/runtime";
 import { createScreeningInvoice } from "@/lib/billing";
@@ -192,7 +192,8 @@ export async function cancelScreening(form: FormData) {
 
 /** Staff: invoice everything billable for one employer. */
 export async function invoiceEmployerScreenings(form: FormData) {
-  const store = await staff();
+  await requireCap("bill");
+  const store = await db();
   const employer = await store.table("employers").get(str(form, "employerId"));
   if (!employer) return;
   const rows = billable(await store.table("screenings").list({ employerId: employer.id } as Partial<Screening>));
@@ -204,4 +205,5 @@ export async function invoiceEmployerScreenings(form: FormData) {
   );
   for (const r of rows) await store.table("screenings").upsert({ ...r, invoiceId: inv.id, updatedAt: nowISO() });
   revalidatePath("/recruiter/screenings");
+  revalidatePath("/admin/billing");
 }

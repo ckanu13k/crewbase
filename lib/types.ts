@@ -208,3 +208,12 @@ export interface Screening {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Admins and recruiters. Admins listed in ADMIN_EMAILS (or the older STAFF_EMAILS) always count as admin. */
+export interface TeamMember {
+  id: string;
+  email: string;
+  name: string;
+  role: "admin" | "recruiter";
+  createdAt: string;
+}

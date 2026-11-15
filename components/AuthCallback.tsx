@@ -20,7 +20,7 @@ export function AuthCallback({ supabaseUrl, anonKey }: { supabaseUrl: string; an
       });
       const body = await res.json();
       if (!res.ok) return setMsg(body.error ?? "Sign-in failed");
-      window.location.replace(body.role === "worker" ? "/me" : body.role === "employer" ? "/employer" : "/recruiter");
+      window.location.replace(body.home ?? "/");
     })();
   }, [supabaseUrl, anonKey]);
   return <p className="p-8 text-center text-slate-600">{msg}</p>;

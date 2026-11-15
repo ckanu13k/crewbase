@@ -28,7 +28,7 @@ export function LoginForm({ lang, mode: initial, supabaseUrl, anonKey }: { lang:
     const res = await fetch("/api/auth/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accessToken: data.session.access_token, refreshToken: data.session.refresh_token }) });
     const body = await res.json();
     if (!res.ok) return setErr(body.error ?? "Sign-in failed");
-    window.location.href = body.role === "worker" ? "/me" : body.role === "employer" ? "/employer" : "/recruiter";
+    window.location.href = body.home ?? "/";
   }
 
   return (

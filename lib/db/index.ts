@@ -5,7 +5,7 @@
 
 import "server-only";
 import type {
-  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TrainingProgram, Worker,
+  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TeamMember, TrainingProgram, Worker,
 } from "../types";
 
 export interface Rows {
@@ -19,6 +19,7 @@ export interface Rows {
   onboarding_sessions: OnboardingSession;
   outbox: OutboxMessage;
   screenings: Screening;
+  team_members: TeamMember;
 }
 export type TableName = keyof Rows;
 

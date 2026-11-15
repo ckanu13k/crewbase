@@ -2,6 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { Languages, LogOut, Sparkles } from "lucide-react";
 import { isDemo } from "@/lib/db";
+import { getSession } from "@/lib/session";
+import { ROLE_LABEL } from "@/lib/permissions";
 import { t } from "@/lib/i18n";
 import type { Lang } from "@/lib/types";
 import { Logo } from "./Logo";
@@ -20,7 +22,9 @@ export function workerNav(lang: Lang): Nav {
 export const employerNav: Nav = [
   { href: "/employer", label: "Jobs", icon: "jobs" },
   { href: "/employer/jobs/new", label: "Post a job", icon: "post" },
+  { href: "/employer/hires", label: "Hires & billing", icon: "placements" },
 ];
+/** Recruiter workspace. Admins see the same plus a link to their own workspace (added in Shell). */
 export const staffNav: Nav = [
   { href: "/recruiter", label: "Dashboard", icon: "dashboard" },
   { href: "/recruiter/optimize", label: "Optimizer", icon: "optimize" },
@@ -28,13 +32,25 @@ export const staffNav: Nav = [
   { href: "/recruiter/screenings", label: "Screening", icon: "screening" },
   { href: "/recruiter/workers", label: "Workers", icon: "workers" },
   { href: "/recruiter/placements", label: "Placements", icon: "placements" },
-  { href: "/recruiter/employers", label: "Employers", icon: "employers" },
-  { href: "/recruiter/training", label: "Training", icon: "training" },
   { href: "/recruiter/outbox", label: "Texts", icon: "texts" },
 ];
+/** Admin workspace: the business side. */
+export const adminNav: Nav = [
+  { href: "/admin", label: "Overview", icon: "dashboard" },
+  { href: "/admin/billing", label: "Billing", icon: "billing" },
+  { href: "/admin/employers", label: "Employers", icon: "employers" },
+  { href: "/admin/team", label: "Team", icon: "team" },
+  { href: "/admin/training", label: "Training", icon: "training" },
+  { href: "/admin/settings", label: "Settings", icon: "settings" },
+  { href: "/recruiter", label: "Recruiting", icon: "workers" },
+];
 
-export async function Shell({ lang, nav, back, wide, bare, children }: { lang: Lang; nav?: Nav; back?: string; wide?: boolean; bare?: boolean; children: React.ReactNode }) {
+export async function Shell({ lang, nav: navIn, back, wide, bare, children }: { lang: Lang; nav?: Nav; back?: string; wide?: boolean; bare?: boolean; children: React.ReactNode }) {
   const demo = isDemo();
+  const session = navIn ? await getSession() : null;
+  // Admins working in the recruiter screens get a way back to their own workspace.
+  const nav = navIn === staffNav && session?.role === "admin" ? [...staffNav, { href: "/admin", label: "Admin", icon: "settings" }] : navIn;
+  const persona = session ? ROLE_LABEL[session.role] : null;
   const signedIn = !demo && Boolean((await cookies()).get("cp_token")?.value);
   const width = wide ? "max-w-6xl" : "max-w-3xl";
   return (
@@ -44,6 +60,9 @@ export async function Shell({ lang, nav, back, wide, bare, children }: { lang: L
           <Link href="/" aria-label="CrewPass home"><Logo /></Link>
           {nav && <DesktopNav items={nav} />}
           <div className="ml-auto flex items-center gap-1">
+            {persona && (session?.role === "admin" || session?.role === "recruiter") && (
+              <span className="hidden rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 sm:inline" data-testid="persona">{persona}</span>
+            )}
             <form action="/api/lang" method="post">
               <input type="hidden" name="lang" value={lang === "en" ? "es" : "en"} />
               <input type="hidden" name="back" value={back ?? "/"} />

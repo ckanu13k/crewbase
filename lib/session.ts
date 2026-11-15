@@ -10,8 +10,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { isDemo } from "./db";
 import type { Lang } from "./types";
+import { can, isStaffRole, normalizeRole, type Capability, type Role } from "./permissions";
 
-export type Role = "worker" | "employer" | "staff";
+export type { Role } from "./permissions";
 
 export interface Session {
   role: Role;
@@ -28,7 +29,7 @@ export async function getLang(): Promise<Lang> {
 export async function getSession(): Promise<Session | null> {
   const c = await cookies();
   if (isDemo()) {
-    const role = c.get("cp_role")?.value as Role | undefined;
+    const role = normalizeRole(c.get("cp_role")?.value);
     if (!role) return null;
     return { role, workerId: c.get("cp_worker")?.value ?? null, employerId: c.get("cp_employer")?.value ?? null, userId: null };
   }
@@ -38,17 +39,40 @@ export async function getSession(): Promise<Session | null> {
   const { data: user } = await admin.auth.getUser(token);
   if (!user.user) return null;
   const { data: profile } = await admin.from("profiles").select("*").eq("id", user.user.id).maybeSingle();
-  if (!profile) return null;
-  return { role: profile.role, workerId: profile.worker_id, employerId: profile.employer_id, userId: user.user.id };
+  let role = normalizeRole(profile?.role);
+  if (!profile || !role) return null;
+  // Staff access is re-checked on every request so removing someone from the team locks them out at once.
+  if (isStaffRole(role)) {
+    const { staffRoleFor } = await import("./team");
+    const current = await staffRoleFor(user.user.email);
+    if (!current) return null;
+    role = current;
+  }
+  return { role, workerId: profile.worker_id, employerId: profile.employer_id, userId: user.user.id };
 }
 
-export async function requireRole(...roles: Role[]): Promise<Session> {
+/**
+ * Gate a page or action by persona. "staff" means admin or recruiter.
+ * Admins pass every gate; recruiters also pass employer gates (they post jobs for employers).
+ */
+export async function requireRole(...roles: (Role | "staff")[]): Promise<Session> {
   const s = await getSession();
   if (!s) redirect(isDemo() ? "/" : "/login");
-  // Staff can see every screen.
-  if (!roles.includes(s.role) && s.role !== "staff") redirect("/");
+  const wanted = roles.flatMap((r) => (r === "staff" ? (["admin", "recruiter"] as Role[]) : [r]));
+  const ok = s.role === "admin" || wanted.includes(s.role) || (s.role === "recruiter" && wanted.includes("employer"));
+  if (!ok) redirect("/");
   return s;
 }
+
+/** Gate by capability (see lib/permissions.ts). */
+export async function requireCap(cap: Capability): Promise<Session> {
+  const s = await getSession();
+  if (!s) redirect(isDemo() ? "/" : "/login");
+  if (!can(s.role, cap)) redirect(isStaffRole(s.role) ? "/recruiter" : "/");
+  return s;
+}
+
+export const isStaff = (s: Session | null | undefined) => isStaffRole(s?.role);
 
 export async function requireWorker(): Promise<Session & { workerId: string }> {
   const s = await requireRole("worker");

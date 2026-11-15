@@ -4,6 +4,7 @@ import { Shell, staffNav } from "@/components/Shell";
 import { money } from "@/lib/training";
 import { updatePlacement } from "@/app/actions";
 import type { PlacementStatus } from "@/lib/types";
+import { can } from "@/lib/permissions";
 
 const STYLE: Record<PlacementStatus, string> = {
   active: "bg-sky-100 text-sky-800", day30_confirmed: "bg-amber-100 text-amber-900", invoiced: "bg-violet-100 text-violet-800",
@@ -11,7 +12,8 @@ const STYLE: Record<PlacementStatus, string> = {
 };
 
 export default async function Placements() {
-  await requireRole("staff");
+  const session = await requireRole("staff");
+  const billing = can(session.role, "bill");
   const lang = await getLang();
   const store = await db();
   const today = todayISO();
@@ -61,8 +63,8 @@ export default async function Placements() {
                 <td>
                   <div className="flex flex-wrap gap-1">
                     {p.status === "active" && (p.day30Date <= today ? <Btn id={p.id} action="confirm" label="Still employed ✔" primary /> : <span className="muted">wait</span>)}
-                    {p.status === "day30_confirmed" && <Btn id={p.id} action="invoice" label="Create invoice" primary />}
-                    {p.status === "invoiced" && <Btn id={p.id} action="paid" label="Mark paid" primary />}
+                    {p.status === "day30_confirmed" && (billing ? <Btn id={p.id} action="invoice" label="Create invoice" primary /> : <span className="muted">Admin invoices</span>)}
+                    {p.status === "invoiced" && billing && <Btn id={p.id} action="paid" label="Mark paid" primary />}
                     {["active", "day30_confirmed", "invoiced", "paid"].includes(p.status) && p.guaranteeEndsOn >= today && <Btn id={p.id} action="left" label="Left early" />}
                   </div>
                 </td>

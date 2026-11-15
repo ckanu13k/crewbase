@@ -1,27 +1,32 @@
-import { requireRole, getLang } from "@/lib/session";
+import { requireCap, getLang } from "@/lib/session";
 import { db } from "@/lib/db";
-import { Shell, staffNav } from "@/components/Shell";
+import { Shell, adminNav } from "@/components/Shell";
 import { createEmployer } from "@/app/actions";
+import { money } from "@/lib/training";
 
 export default async function Employers() {
-  await requireRole("staff");
+  await requireCap("manageEmployers");
   const lang = await getLang();
   const store = await db();
-  const [employers, jobs] = await Promise.all([store.table("employers").list(), store.table("jobs").list()]);
+  const [employers, jobs, placements] = await Promise.all([store.table("employers").list(), store.table("jobs").list(), store.table("placements").list()]);
+  const fees = (id: string) => placements.filter((p) => p.employerId === id && ["invoiced", "paid"].includes(p.status)).reduce((a, p) => a + p.fee, 0);
   return (
-    <Shell lang={lang} nav={staffNav} back="/recruiter/employers" wide>
-      <h1 className="h1 mb-3">Employers</h1>
+    <Shell lang={lang} nav={adminNav} back="/admin/employers" wide>
+      <h1 className="h1">Employers</h1>
+      <p className="muted mb-3">Employer accounts. The contact email is what lets that company sign in and see its own jobs, shortlists, hires and invoices.</p>
       <div className="grid gap-4 md:grid-cols-[1fr_320px]">
         <div className="card overflow-x-auto">
           <table className="data">
-            <thead><tr><th>Company</th><th>Contact</th><th>ZIP</th><th>Jobs</th></tr></thead>
+            <thead><tr><th>Company</th><th>Contact (signs in)</th><th>ZIP</th><th>Open jobs</th><th>Hires</th><th>Billed</th></tr></thead>
             <tbody>
               {employers.map((e) => (
                 <tr key={e.id}>
                   <td className="font-semibold">{e.name}</td>
                   <td>{e.contactName}<div className="muted">{e.email} · {e.phone}</div></td>
                   <td>{e.zip}</td>
-                  <td>{jobs.filter((j) => j.employerId === e.id).length}</td>
+                  <td>{jobs.filter((j) => j.employerId === e.id && j.status === "open").length}</td>
+                  <td>{placements.filter((p) => p.employerId === e.id).length}</td>
+                  <td>{money(fees(e.id))}</td>
                 </tr>
               ))}
             </tbody>

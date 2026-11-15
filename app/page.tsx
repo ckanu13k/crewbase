@@ -5,6 +5,7 @@ import {
   Phone, ShieldCheck, Sparkles, Users,
 } from "lucide-react";
 import { db, isDemo } from "@/lib/db";
+import { HOME } from "@/lib/permissions";
 import { getLang, getSession } from "@/lib/session";
 import { tradeLabel } from "@/lib/taxonomy";
 import { Shell } from "@/components/Shell";
@@ -15,7 +16,7 @@ export default async function Home() {
   const es = lang === "es";
   const demo = isDemo();
   const session = await getSession();
-  if (session && !demo) redirect(session.role === "worker" ? "/me" : session.role === "employer" ? "/employer" : "/recruiter");
+  if (session && !demo) redirect(HOME[session.role]);
 
   const store = await db();
   const [workers, employers] = demo ? await Promise.all([store.table("workers").list(), store.table("employers").list()]) : [[], []];
@@ -206,12 +207,18 @@ export default async function Home() {
                 </div>
               </div>
               <div className="card bg-gradient-to-br from-brand-deep to-blue-700 text-white">
-                <div className="font-semibold">Recruiter console</div>
-                <p className="mt-1 text-sm text-blue-100">Review cards, rank candidates, run placements and invoices.</p>
-                <form action="/api/demo" method="post" className="mt-4">
-                  <input type="hidden" name="role" value="staff" />
-                  <button className="btn w-full bg-white text-brand-dark hover:bg-blue-50">Open console <ArrowRight size={16} /></button>
-                </form>
+                <div className="font-semibold">Our team</div>
+                <p className="mt-1 text-sm text-blue-100">Recruiters match and screen; admins also run billing, the team and settings.</p>
+                <div className="mt-4 grid gap-2">
+                  <form action="/api/demo" method="post">
+                    <input type="hidden" name="role" value="recruiter" />
+                    <button className="btn w-full bg-white text-brand-dark hover:bg-blue-50">Open console <ArrowRight size={16} /></button>
+                  </form>
+                  <form action="/api/demo" method="post">
+                    <input type="hidden" name="role" value="admin" />
+                    <button className="btn w-full bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20">Open admin <ArrowRight size={16} /></button>
+                  </form>
+                </div>
               </div>
             </div>
           </div>

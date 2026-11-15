@@ -2,7 +2,7 @@
 // Dates are relative to "today" so the demo always shows upcoming starts and expiring cards.
 
 import type {
-  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TrainingProgram, Worker,
+  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TeamMember, TrainingProgram, Worker,
 } from "../types";
 
 const DAY = 86_400_000;
@@ -249,6 +249,11 @@ export function seedData() {
     placements: index(placements),
     training_programs: index(training_programs),
     screenings: index(screenings),
+    team_members: index([
+      { id: "tm1", email: "owner@example.com", name: "Demo Admin", role: "admin", createdAt: ts(-90) },
+      { id: "tm2", email: "maria@example.com", name: "María López (demo recruiter)", role: "recruiter", createdAt: ts(-60) },
+      { id: "tm3", email: "james@example.com", name: "James Carter (demo recruiter)", role: "recruiter", createdAt: ts(-30) },
+    ] satisfies TeamMember[]),
     onboarding_sessions: {} as Record<string, OnboardingSession>,
     outbox: {} as Record<string, OutboxMessage>,
   };

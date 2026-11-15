@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { requireRole, getLang } from "@/lib/session";
+import { requireCap, getLang } from "@/lib/session";
 import { db, todayISO } from "@/lib/db";
-import { Shell, staffNav } from "@/components/Shell";
+import { Shell, adminNav } from "@/components/Shell";
 import { CREDENTIALS, SKILLS, TRADES, credShort } from "@/lib/taxonomy";
 import { FUNDING_LABEL, money, needsReview, programServesJob, sortPrograms, REVIEW_EVERY_DAYS } from "@/lib/training";
 import { deleteProgram, saveProgram } from "@/app/actions";
 import type { Funding } from "@/lib/types";
 
 export default async function TrainingAdmin({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
-  await requireRole("staff");
+  await requireCap("manageTraining");
   const sp = await searchParams;
   const lang = await getLang();
   const store = await db();
@@ -20,7 +20,7 @@ export default async function TrainingAdmin({ searchParams }: { searchParams: Pr
   const p = sp.edit ? programs.find((x) => x.id === sp.edit) : undefined;
 
   return (
-    <Shell lang={lang} nav={staffNav} back="/recruiter/training" wide>
+    <Shell lang={lang} nav={adminNav} back="/admin/training" wide>
       <h1 className="h1">Training directory</h1>
       <p className="muted mb-4">
         What workers see under Training and in “what you're missing”, ranked by how many open positions ask for what each program gives. When an employer or regulator changes a requirement, edit the program here: saving marks it reviewed today. Programs not reviewed in {REVIEW_EVERY_DAYS} days are flagged.
@@ -40,7 +40,7 @@ export default async function TrainingAdmin({ searchParams }: { searchParams: Pr
                   <td className="text-xs">{[...x.coversCredentials.map(credShort), ...(x.nccerLevel ? [`NCCER ${x.nccerLevel}`] : [])].join(", ") || "—"}{x.coversSkills.length ? ` +${x.coversSkills.length} skills` : ""}</td>
                   <td className={`text-xs ${needsReview(x, today) ? "font-semibold text-amber-700" : "text-slate-500"}`}>{x.reviewedOn ?? "never"}{needsReview(x, today) ? " · review" : ""}</td>
                   <td className="whitespace-nowrap">
-                    <Link href={`/recruiter/training?edit=${x.id}`} className="btn-ghost btn-sm">Edit</Link>
+                    <Link href={`/admin/training?edit=${x.id}`} className="btn-ghost btn-sm">Edit</Link>
                     <form action={deleteProgram} className="inline"><input type="hidden" name="id" value={x.id} /><button className="btn-sm text-slate-400 hover:text-red-600">✕</button></form>
                   </td>
                 </tr>
@@ -85,7 +85,7 @@ export default async function TrainingAdmin({ searchParams }: { searchParams: Pr
           </div></details>
           <div className="flex gap-2">
             <button className="btn-primary flex-1">{p ? "Save" : "Add program"}</button>
-            {p && <Link href="/recruiter/training" className="btn-ghost">Cancel</Link>}
+            {p && <Link href="/admin/training" className="btn-ghost">Cancel</Link>}
           </div>
         </form>
       </div>

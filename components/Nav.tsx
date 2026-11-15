@@ -4,18 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BadgeCheck, Briefcase, ClipboardCheck, GraduationCap, Home, LayoutDashboard, MessageSquare, PlusCircle,
-  Users, Building2, HandCoins, BookOpen, Workflow, ShieldCheck, type LucideIcon,
+  Users, Building2, HandCoins, BookOpen, Workflow, ShieldCheck, Receipt, UsersRound, Settings, type LucideIcon,
 } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: string };
 
 const ICONS: Record<string, LucideIcon> = {
   home: Home, wallet: BadgeCheck, training: GraduationCap, practice: BookOpen, jobs: Briefcase, post: PlusCircle,
-  dashboard: LayoutDashboard, review: ClipboardCheck, workers: Users, placements: HandCoins, employers: Building2, texts: MessageSquare, optimize: Workflow, screening: ShieldCheck,
+  dashboard: LayoutDashboard, review: ClipboardCheck, workers: Users, placements: HandCoins, employers: Building2, texts: MessageSquare, optimize: Workflow, screening: ShieldCheck, billing: Receipt, team: UsersRound, settings: Settings,
 };
 
 function isActive(path: string, href: string) {
-  if (href === "/me" || href === "/recruiter" || href === "/employer") return path === href || (href === "/me" && path.startsWith("/me/jobs"));
+  if (href === "/me" || href === "/recruiter" || href === "/employer" || href === "/admin") return path === href || (href === "/me" && path.startsWith("/me/jobs"));
   return path === href || path.startsWith(href + "/");
 }
 

@@ -195,7 +195,7 @@ export default async function OptimizerPage() {
                     <td className="font-semibold">{job.title}<div className="muted">{place(job.zip)}</div></td>
                     <td>{js.open - js.filled}</td>
                     <td className="text-sm">{top.length ? top.map((x) => <div key={x.gap.kind + (x.gap.credential ?? x.gap.skill ?? "")}>{gapText(x.gap, "en")} <span className="text-slate-400">({x.n} worker{x.n > 1 ? "s" : ""})</span></div>) : <span className="muted">{nearby ? `Every qualified ${tradeLabel(job.trade, "en").toLowerCase()} within 50 mi is already in the plan — recruit more` : `No ${tradeLabel(job.trade, "en").toLowerCase()}s within 50 mi yet — recruit in this area`}</span>}</td>
-                    <td className="text-sm">{top.map((x) => x.program ? <div key={x.program.id + x.gap.kind}><Link href="/recruiter/training" className="text-brand-dark underline">{x.program.name}</Link> <span className="text-slate-400">· {x.program.city}</span></div> : null)}</td>
+                    <td className="text-sm">{top.map((x) => x.program ? <div key={x.program.id + x.gap.kind}><Link href="/training" className="text-brand-dark underline">{x.program.name}</Link> <span className="text-slate-400">· {x.program.city}</span></div> : null)}</td>
                   </tr>
                 ))}
               </tbody>

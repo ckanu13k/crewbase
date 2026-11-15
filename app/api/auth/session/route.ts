@@ -3,6 +3,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { db, isDemo, newId, nowISO } from "@/lib/db";
+import { staffRoleFor } from "@/lib/team";
+import { HOME, normalizeRole } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   if (isDemo()) return new NextResponse("Not found", { status: 404 });
@@ -15,14 +17,19 @@ export async function POST(req: Request) {
   const user = data.user;
 
   let { data: profile } = await admin.from("profiles").select("*").eq("id", user.id).maybeSingle();
-  if (!profile) {
-    const store = await db();
-    const staffEmails = (process.env.STAFF_EMAILS ?? "").toLowerCase().split(",").map((s) => s.trim()).filter(Boolean);
-    const email = user.email?.toLowerCase();
-    if (email && staffEmails.includes(email)) {
-      profile = { id: user.id, role: "staff", worker_id: null, employer_id: null };
-    } else if (email) {
-      // Employers are created by staff first (Recruiter → Employers); their contact email unlocks sign-in.
+  const store = await db();
+  const email = user.email?.toLowerCase();
+  // Team roles are re-read at every sign-in, so promotions and removals take effect right away.
+  const staffRole = await staffRoleFor(email);
+  if (staffRole) {
+    profile = { id: user.id, role: staffRole, worker_id: null, employer_id: null };
+    const { error: upErr } = await admin.from("profiles").upsert(profile);
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+  } else if (profile && (profile.role === "admin" || profile.role === "recruiter" || profile.role === "staff")) {
+    return NextResponse.json({ error: "Your team access was removed. Ask an admin to add you again." }, { status: 403 });
+  } else if (!profile) {
+    if (email) {
+      // Employers are created by an admin first (Admin → Employers); their contact email unlocks sign-in.
       const employer = (await store.table("employers").list()).find((e) => e.email.toLowerCase() === email);
       if (!employer) return NextResponse.json({ error: "No employer account for this email yet. Contact us to get set up." }, { status: 403 });
       profile = { id: user.id, role: "employer", worker_id: null, employer_id: employer.id };
@@ -43,7 +50,7 @@ export async function POST(req: Request) {
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
-  const res = NextResponse.json({ role: profile.role });
+  const res = NextResponse.json({ role: profile.role, home: HOME[normalizeRole(profile.role) ?? "worker"] });
   const cookie = { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" };
   res.cookies.set("cp_token", accessToken, { ...cookie, maxAge: 60 * 60 });
   if (refreshToken) res.cookies.set("cp_refresh", refreshToken, { ...cookie, maxAge: 60 * 60 * 24 * 30 });

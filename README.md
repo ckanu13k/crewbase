@@ -20,7 +20,7 @@ Demo mode uses fictional sample workers, employers, jobs and training programs (
 
 ## Go live (Vercel + Supabase)
 
-1. **Supabase**: create a project. In the SQL editor run `supabase/migrations/0001_init.sql`, `0002_rate_limits.sql`, `0003_locations.sql`, then `0004_screenings.sql` (or all at once: `supabase/setup.sql`). Optional demo board: run `supabase/demo-data.sql` (25 fictional workers, 6 employers, 11 jobs, 10 training programs; regenerate with `npm run demo:sql`). Demo phone numbers are in the reserved 555-01xx range and are never texted.
+1. **Supabase**: create a project. In the SQL editor run `supabase/migrations/0001_init.sql`, `0002_rate_limits.sql`, `0003_locations.sql`, `0004_screenings.sql`, then `0005_team_roles.sql` (or all at once: `supabase/setup.sql`). Optional demo board: run `supabase/demo-data.sql` (25 fictional workers, 6 employers, 11 jobs, 10 training programs; regenerate with `npm run demo:sql`). Demo phone numbers are in the reserved 555-01xx range and are never texted.
    - Auth → Providers → **Email**: on. Auth → Email templates → **Magic link**: include `{{ .Token }}` so people get a 6-digit code (the sign-in screen asks for a code, not a link).
    - Auth → Providers → **Phone**: on, provider **Twilio Verify** (no A2P 10DLC needed for Verify codes).
    - Auth → URL configuration: set the Site URL to your Vercel URL.
@@ -32,7 +32,7 @@ Demo mode uses fictional sample workers, employers, jobs and training programs (
 7. **Stripe**: set `STRIPE_SECRET_KEY`. "Create invoice" on a day-30-confirmed placement creates, finalizes and emails a net-15 invoice.
 8. **Cron**: `vercel.json` runs the expiry-reminder texts daily at 14:00 UTC (8 or 9 am in Houston), authenticated with `CRON_SECRET`.
 
-Sign-in: workers use their phone (one-time code); employers and staff use email codes. Staff = any email in `STAFF_EMAILS`. Employers can sign in once a recruiter adds their company with that contact email (Recruiter → Employers). Sessions refresh automatically for 30 days (`proxy.ts`).
+Sign-in: workers use their phone (one-time code); employers and staff use email codes. Owners in `ADMIN_EMAILS` (or the older `STAFF_EMAILS`) are always admins; everyone else on the team is added in **Admin → Team**. Employers can sign in once a recruiter adds their company with that contact email (Recruiter → Employers). Sessions refresh automatically for 30 days (`proxy.ts`).
 
 ## Where things live
 
@@ -52,6 +52,18 @@ Sign-in: workers use their phone (one-time code); employers and staff use email 
 | Recruiter console | `app/recruiter/*`, `app/actions.ts` |
 | Placement invoices | `lib/billing.ts` |
 | Session refresh, rate limits, health | `proxy.ts`, `lib/ratelimit.ts`, `app/api/health` |
+
+## Personas and workspaces
+
+| Persona | Lands on | Can do | Can't do |
+| --- | --- | --- | --- |
+| **Admin** (owner) | `/admin` | Everything below, plus revenue overview, **Billing** (placement + screening invoices, mark paid), **Team** (add recruiters/admins), **Employers** (accounts that can sign in), **Training** directory, **Settings** (integrations, defaults, demo data) | — |
+| **Recruiter** | `/recruiter` | Pipeline, Optimizer, card Review, Screening (request, record, review, notices), Workers, Placements (day-30 check, left early), Texts, post jobs for an employer | Invoices, payments, team, employer accounts, training directory, settings |
+| **Employer** | `/employer` | Their own jobs, shortlists (outcome-only screening status), **Hires & billing** (guarantee dates, invoices) | Other employers' data, worker contact details |
+| **Worker** | `/me` | Profile, cards, matched jobs, screening authorization, training, practice | Anything about other people |
+| **Visitor** | `/` | Landing, training directory, practice quizzes, sign-up | — |
+
+Permissions live in `lib/permissions.ts` (tested). Team access is re-checked on every request, so removing someone locks them out immediately.
 
 ## Matching and location
 

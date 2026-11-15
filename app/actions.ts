@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isStaffRole } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { db, newId, nowISO, todayISO } from "@/lib/db";
-import { requireEmployer, requireRole, requireWorker, getLang } from "@/lib/session";
+import { requireCap, requireEmployer, requireRole, requireWorker, getLang } from "@/lib/session";
+import { can, type Capability } from "@/lib/permissions";
 import { readCardPhoto } from "@/lib/ai/credential";
 import { sendSms } from "@/lib/messaging";
 import { createPlacementInvoice } from "@/lib/billing";
@@ -131,7 +133,7 @@ function defaultFee(j: Pick<Job, "trade" | "minYears" | "minNccerLevel" | "requi
 
 export async function createJob(form: FormData) {
   const s = await requireRole("employer");
-  const employerId = s.role === "staff" ? str(form, "employerId") : s.employerId!;
+  const employerId = isStaffRole(s.role) ? str(form, "employerId") : s.employerId!;
   const store = await db();
   const trade = str(form, "trade");
   if (!TRADE_BY_ID[trade] || !(await store.table("employers").get(employerId))) throw new Error("Invalid job");
@@ -151,7 +153,7 @@ export async function createJob(form: FormData) {
   await store.table("jobs").upsert(job);
   revalidatePath("/employer");
   revalidatePath("/recruiter");
-  redirect(s.role === "staff" ? `/recruiter/jobs/${job.id}` : `/employer/jobs/${job.id}?new=1`);
+  redirect(isStaffRole(s.role) ? `/recruiter/jobs/${job.id}` : `/employer/jobs/${job.id}?new=1`);
 }
 
 export async function employerRespond(form: FormData) {
@@ -170,6 +172,12 @@ export async function employerRespond(form: FormData) {
 
 async function staff() {
   const s = await requireRole("staff");
+  return { s, store: await db() };
+}
+
+/** Admin-only actions (billing, employer accounts, training directory). */
+async function withCap(cap: Capability) {
+  const s = await requireCap(cap);
   return { s, store: await db() };
 }
 
@@ -256,13 +264,16 @@ export async function markHired(form: FormData) {
   if (hired >= job.headcount) await store.table("jobs").upsert({ ...job, status: "filled" });
   revalidatePath(`/recruiter/jobs/${job.id}`);
   revalidatePath("/recruiter/placements");
+  revalidatePath("/admin/billing");
 }
 
 export async function updatePlacement(form: FormData) {
-  const { store } = await staff();
+  const { s, store } = await staff();
   const p = await store.table("placements").get(str(form, "placementId"));
   if (!p) return;
   const action = str(form, "action");
+  // Recruiters confirm day 30 and record early leavers; invoicing and payments are admin-only.
+  if ((action === "invoice" || action === "paid") && !can(s.role, "bill")) return;
   if (action === "confirm") {
     await store.table("placements").upsert({ ...p, status: "day30_confirmed" });
   } else if (action === "invoice") {
@@ -305,11 +316,11 @@ export async function reviewCredential(form: FormData) {
 }
 
 export async function createEmployer(form: FormData) {
-  const { store } = await staff();
+  const { store } = await withCap("manageEmployers");
   const name = str(form, "name");
   if (!name) return;
   await store.table("employers").upsert({ id: newId(), name, contactName: str(form, "contactName"), email: str(form, "email").toLowerCase(), phone: str(form, "phone"), zip: str(form, "zip"), createdAt: nowISO() });
-  revalidatePath("/recruiter/employers");
+  revalidatePath("/admin/employers");
 }
 
 export async function runRemindersNow() {
@@ -321,7 +332,7 @@ export async function runRemindersNow() {
 // ---------------- Training directory (staff) ----------------
 
 export async function saveProgram(form: FormData) {
-  const { store } = await staff();
+  const { store } = await withCap("manageTraining");
   const id = str(form, "id") || newId();
   const numOrNull = (k: string) => (str(form, k) === "" ? null : Number(str(form, k)));
   const existing = await store.table("training_programs").get(id);
@@ -347,15 +358,15 @@ export async function saveProgram(form: FormData) {
     // Saving is the review: whoever edits the program has just checked it.
     reviewedOn: todayISO(),
   });
-  revalidatePath("/recruiter/training");
+  revalidatePath("/admin/training");
   revalidatePath("/training");
-  redirect("/recruiter/training");
+  redirect("/admin/training");
 }
 
 export async function deleteProgram(form: FormData) {
-  const { store } = await staff();
+  const { store } = await withCap("manageTraining");
   await store.table("training_programs").remove(str(form, "id"));
-  revalidatePath("/recruiter/training");
+  revalidatePath("/admin/training");
   revalidatePath("/training");
 }
 
