@@ -8,7 +8,8 @@ import { credLabel, skillLabel, tradeLabel } from "@/lib/taxonomy";
 import { gapText, money } from "@/lib/training";
 import { markHired, setMatchStage, shortlist, textTopMatches, textWorkerAboutJob } from "@/app/actions";
 import { requestScreenings } from "@/app/screening-actions";
-import { DEFAULT_PRICE, KIND_LABEL, employerLabel, hireGate, kindsToOrder, requiredKinds } from "@/lib/screening/policy";
+import { getSettings, screeningPrice } from "@/lib/settings";
+import { KIND_LABEL, employerLabel, hireGate, kindsToOrder, requiredKinds } from "@/lib/screening/policy";
 import type { MatchStage, Worker } from "@/lib/types";
 import type { MatchResult } from "@/lib/matching";
 
@@ -22,6 +23,7 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
   if (!data) notFound();
   const { job, employer, ranked, matches, screeningsByWorker, today } = data;
   const kinds = requiredKinds(job);
+  const cfg = await getSettings();
   const matchByWorker = Object.fromEntries(matches.map((m) => [m.workerId, m]));
   const eligible = ranked.filter((r) => r.result.eligible);
   const close = ranked.filter((r) => !r.result.eligible && r.result.gaps.filter((g) => g.blocking).length <= 2).slice(0, 8);
@@ -36,11 +38,14 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
           {kinds.length > 0 && <p className="mt-1 text-sm"><b>Before day one:</b> {kinds.map((k) => KIND_LABEL[k].en).join(" + ")} · <Link href="/recruiter/screenings" className="text-brand underline">Screenings →</Link></p>}
           <p className="mt-1 text-sm"><b>Required:</b> {job.requiredCredentials.map((c) => credLabel(c, "en")).join(", ")}{job.minNccerLevel ? ` · NCCER ${job.minNccerLevel}+` : ""}{job.minYears ? ` · ${job.minYears}+ yrs` : ""} · <b>Skills:</b> {job.requiredSkills.map((s) => skillLabel(s, "en")).join(", ")}</p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <Link href={`/employer/jobs/${job.id}/edit`} className="btn-ghost btn-sm">Edit job</Link>
         <form action={textTopMatches} className="flex items-center gap-2">
           <input type="hidden" name="jobId" value={job.id} />
           <input type="hidden" name="limit" value="10" />
           <button className="btn-primary btn-sm">Text top 10 eligible workers</button>
         </form>
+        </div>
       </div>
 
       <h2 className="h2 mb-2 mt-6">Pipeline</h2>
@@ -80,7 +85,7 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
                         {toOrder.length > 0 && ["sent", "interview"].includes(m.stage) && (
                           <form action={requestScreenings} className="flex flex-wrap items-center gap-1 pt-1">
                             <input type="hidden" name="matchId" value={m.id} />
-                            {toOrder.map((k) => <input key={k} type="hidden" name={`price_${k}`} value={DEFAULT_PRICE[k]} />)}
+                            {toOrder.map((k) => <input key={k} type="hidden" name={`price_${k}`} value={screeningPrice(k, cfg)} />)}
                             <button className="btn-soft btn-sm">Request {toOrder.map((k) => KIND_LABEL[k].en.toLowerCase()).join(" + ")}</button>
                           </form>
                         )}

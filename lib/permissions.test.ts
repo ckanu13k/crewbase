@@ -16,6 +16,12 @@ describe("permissions", () => {
     }
     expect(can(null, "recruit")).toBe(false);
   });
+  it("limits training providers to their own listings", () => {
+    expect(can("provider", "manageOwnListings")).toBe(true);
+    for (const cap of ["recruit", "bill", "manageTraining", "viewAllCards", "viewAudit"] as const) expect(can("provider", cap)).toBe(false);
+    expect(can("recruiter", "viewAudit")).toBe(false);
+    expect(can("admin", "viewAudit")).toBe(true);
+  });
   it("maps the old shared staff role to admin and rejects unknown roles", () => {
     expect(normalizeRole("staff")).toBe("admin");
     expect(normalizeRole("recruiter")).toBe("recruiter");

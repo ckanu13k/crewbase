@@ -4,6 +4,7 @@ import { db, todayISO } from "@/lib/db";
 import { PageHeader, Shell, staffNav } from "@/components/Shell";
 import { money } from "@/lib/training";
 import { activeProvider } from "@/lib/screening/providers";
+import { getSettings } from "@/lib/settings";
 import {
   ADVERSE_WAIT_BUSINESS_DAYS, FCRA_RIGHTS_URL, KIND_LABEL, billable, businessDaysBetween, canSendFinalNotice, employerLabel,
 } from "@/lib/screening/policy";
@@ -34,6 +35,7 @@ export default async function ScreeningsAdmin() {
     .map((e) => ({ e, rows: billable(rows.filter((r) => r.employerId === e.id)) }))
     .filter((x) => x.rows.length);
   const provider = activeProvider();
+  const wait = (await getSettings()).adverseWaitDays;
 
   return (
     <Shell lang={lang} nav={staffNav} back="/recruiter/screenings" wide>
@@ -48,7 +50,7 @@ export default async function ScreeningsAdmin() {
       />
       <div className="mb-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
         Only the outcome and dates are kept here; reports stay with the provider. A flagged result is never an automatic no: review it, then either clear the worker with a note or follow the two FCRA notices — a pre-adverse notice with a copy of the report and the{" "}
-        <a href={FCRA_RIGHTS_URL} target="_blank" rel="noreferrer" className="underline">Summary of Rights</a>, wait {ADVERSE_WAIT_BUSINESS_DAYS} business days, then a final notice.
+        <a href={FCRA_RIGHTS_URL} target="_blank" rel="noreferrer" className="underline">Summary of Rights</a>, wait {wait} business days, then a final notice.
       </div>
 
       {owed.length > 0 && can(session.role, "bill") && (
@@ -79,7 +81,7 @@ export default async function ScreeningsAdmin() {
                     {r.orderedAt && <div>Ordered {r.orderedAt.slice(0, 10)}</div>}
                     {r.completedAt && <div>Result {r.completedAt.slice(0, 10)}</div>}
                     {r.expiresOn && <div>Good through {r.expiresOn}</div>}
-                    {r.preAdverseAt && <div>Pre-adverse {r.preAdverseAt.slice(0, 10)} ({waited}/{ADVERSE_WAIT_BUSINESS_DAYS} business days)</div>}
+                    {r.preAdverseAt && <div>Pre-adverse {r.preAdverseAt.slice(0, 10)} ({waited}/{wait} business days)</div>}
                     {r.finalAdverseAt && <div>Final notice {r.finalAdverseAt.slice(0, 10)}</div>}
                   </td>
                   <td className="text-sm">{money(r.priceUsd)}{r.invoiceId && <div className="text-xs text-slate-400">invoiced</div>}</td>
@@ -117,8 +119,8 @@ export default async function ScreeningsAdmin() {
                     {r.status === "pre_adverse" && (
                       <form action={sendFinalAdverseNotice}>
                         <input type="hidden" name="id" value={r.id} />
-                        <button className="btn-ghost btn-sm" disabled={!canSendFinalNotice(r, today)}>
-                          {canSendFinalNotice(r, today) ? "Send final notice" : `Final notice after ${ADVERSE_WAIT_BUSINESS_DAYS} business days`}
+                        <button className="btn-ghost btn-sm" disabled={!canSendFinalNotice(r, today, wait)}>
+                          {canSendFinalNotice(r, today, wait) ? "Send final notice" : `Final notice after ${wait} business days`}
                         </button>
                       </form>
                     )}

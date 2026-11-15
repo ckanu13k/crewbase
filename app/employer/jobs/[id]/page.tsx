@@ -6,7 +6,7 @@ import { jobCandidates } from "@/lib/queries";
 import { Shell, employerNav } from "@/components/Shell";
 import { ScorePill, VerificationBadge, ExpiryBadge } from "@/components/Badges";
 import { credLabel, skillLabel, tradeLabel } from "@/lib/taxonomy";
-import { employerRespond } from "@/app/actions";
+import { employerRespond, setJobStatus } from "@/app/actions";
 import { findCredential } from "@/lib/matching";
 import { employerLabel, hireGate, KIND_LABEL, requiredKinds } from "@/lib/screening/policy";
 
@@ -28,7 +28,17 @@ export default async function EmployerJob({ params, searchParams }: { params: Pr
       <Link href="/employer" className="muted">← Jobs</Link>
       {sp.new && <div className="mt-2 rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Posted. {eligible.length} worker(s) meet every requirement right now; a recruiter will confirm availability and send you a shortlist.</div>}
       <div className="card mt-2">
-        <h1 className="h1">{job.title}</h1>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h1 className="h1">{job.title} {job.status !== "open" && <span className="pill bg-slate-100 align-middle text-slate-600">{job.status}</span>}</h1>
+          <div className="flex gap-2">
+            <Link href={`/employer/jobs/${job.id}/edit`} className="btn-ghost btn-sm" data-testid="edit-job">Edit</Link>
+            <form action={setJobStatus}>
+              <input type="hidden" name="id" value={job.id} />
+              <input type="hidden" name="status" value={job.status === "closed" ? "open" : "closed"} />
+              <button className="btn-ghost btn-sm" data-testid="close-job">{job.status === "closed" ? "Reopen" : "Close job"}</button>
+            </form>
+          </div>
+        </div>
         <p className="muted">{tradeLabel(job.trade, "en")} · ${job.payMin}–{job.payMax}/hr · {job.shift} · ZIP {job.zip} · starts {job.startDate} · {job.headcount} opening(s) · fee ${job.placementFee.toLocaleString()} per hire</p>
         <p className="mt-2 text-sm"><b>Required:</b> {job.requiredCredentials.map((c) => credLabel(c, "en")).join(", ") || "—"}{job.minNccerLevel ? ` · NCCER ${job.minNccerLevel}+` : ""}{job.minYears ? ` · ${job.minYears}+ yrs` : ""}</p>
         <p className="text-sm"><b>Skills:</b> {job.requiredSkills.map((x) => skillLabel(x, "en")).join(", ") || "—"}</p>

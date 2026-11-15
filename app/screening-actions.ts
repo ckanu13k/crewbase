@@ -14,6 +14,10 @@ import {
   ADVERSE_WAIT_BUSINESS_DAYS, DEFAULT_PRICE, FCRA_RIGHTS_URL, KIND_LABEL, VALID_DAYS, addDays, billable, canSendFinalNotice, kindsToOrder,
 } from "@/lib/screening/policy";
 import type { Screening, ScreeningKind } from "@/lib/types";
+import { audit } from "@/lib/audit";
+import { emailEmployer } from "@/lib/email";
+import { getSettings, screeningPrice, screeningValidDays } from "@/lib/settings";
+import { getSession } from "@/lib/session";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const KINDS: ScreeningKind[] = ["background", "drug"];
@@ -22,6 +26,8 @@ async function staff() {
   await requireRole("staff");
   return db();
 }
+
+const who = () => getSession();
 
 function refresh(jobId?: string) {
   revalidatePath("/recruiter/screenings");
@@ -46,8 +52,9 @@ export async function requestScreenings(form: FormData) {
   const kinds = (ticked.length ? ticked : [...needed]).filter((k) => needed.has(k));
   if (!kinds.length) return;
   const provider = activeProvider();
+  const cfg = await getSettings();
   for (const kind of kinds) {
-    const price = Number(str(form, `price_${kind}`)) || DEFAULT_PRICE[kind];
+    const price = Number(str(form, `price_${kind}`)) || screeningPrice(kind, cfg) || DEFAULT_PRICE[kind];
     const row: Screening = {
       id: newId(), workerId: worker.id, employerId: job.employerId, jobId: job.id, matchId: m.id, kind, provider,
       providerRef: null, consentUrl: null, status: "awaiting_consent", consentAt: null, consentName: null, orderedAt: null,
@@ -55,6 +62,7 @@ export async function requestScreenings(form: FormData) {
       priceUsd: price, invoiceId: null, createdAt: nowISO(), updatedAt: nowISO(),
     };
     await store.table("screenings").upsert(row);
+    await audit(await who(), "screening.requested", "screening", row.id, `Requested ${KIND_LABEL[kind].en.toLowerCase()} for ${worker.name} (${job.title})`);
   }
   if (worker.consentSms) {
     const es = worker.lang === "es";
@@ -77,6 +85,7 @@ export async function consentToScreenings(form: FormData) {
     const row = await store.table("screenings").get(id);
     if (!row || row.workerId !== s.workerId || row.status !== "awaiting_consent" || row.provider !== "manual") continue;
     await store.table("screenings").upsert({ ...row, status: "in_progress", consentAt: nowISO(), consentName: name, updatedAt: nowISO() });
+    await audit(s, "screening.authorized", "screening", row.id, `Worker signed the authorization for a ${row.kind} check`);
   }
   refresh();
   redirect("/me/screening?ok=1");
@@ -116,6 +125,7 @@ export async function markScreeningOrdered(form: FormData) {
   const { store, row } = await load(form);
   if (!row || row.status !== "in_progress") return;
   await store.table("screenings").upsert({ ...row, orderedAt: row.orderedAt ?? nowISO(), updatedAt: nowISO() });
+  await audit(await who(), "screening.ordered", "screening", row.id, `Ordered ${row.kind} check with the provider`);
   refresh(row.jobId);
 }
 
@@ -126,14 +136,20 @@ export async function recordScreeningResult(form: FormData) {
   const result = str(form, "result");
   if (result !== "clear" && result !== "needs_review") return;
   const today = todayISO();
+  const cfg = await getSettings();
   await store.table("screenings").upsert({
     ...row,
     status: result,
     orderedAt: row.orderedAt ?? nowISO(),
     completedAt: nowISO(),
-    expiresOn: result === "clear" ? addDays(today, VALID_DAYS[row.kind]) : null,
+    expiresOn: result === "clear" ? addDays(today, screeningValidDays(row.kind, cfg) || VALID_DAYS[row.kind]) : null,
     updatedAt: nowISO(),
   });
+  await audit(await who(), "screening.result", "screening", row.id, `Recorded ${row.kind} result: ${result === "clear" ? "clear" : "flagged for review"}`);
+  if (result === "clear") {
+    const job = await store.table("jobs").get(row.jobId);
+    if (job) await emailEmployer(row.employerId, `Screening clear for a candidate — ${job.title}`, `A ${KIND_LABEL[row.kind].en.toLowerCase()} came back clear for a candidate on "${job.title}". ${appUrl()}/employer/jobs/${job.id}`);
+  }
   refresh(row.jobId);
 }
 
@@ -143,7 +159,9 @@ export async function clearAfterReview(form: FormData) {
   if (!row || (row.status !== "needs_review" && row.status !== "pre_adverse")) return;
   const note = str(form, "note").slice(0, 300);
   if (!note) return;
-  await store.table("screenings").upsert({ ...row, status: "clear", reviewedNote: note, expiresOn: addDays(todayISO(), VALID_DAYS[row.kind]), updatedAt: nowISO() });
+  const cfg = await getSettings();
+  await store.table("screenings").upsert({ ...row, status: "clear", reviewedNote: note, expiresOn: addDays(todayISO(), screeningValidDays(row.kind, cfg)), updatedAt: nowISO() });
+  await audit(await who(), "screening.cleared_after_review", "screening", row.id, `Cleared ${row.kind} after individual review: ${note}`);
   refresh(row.jobId);
 }
 
@@ -154,6 +172,7 @@ export async function sendPreAdverseNotice(form: FormData) {
   if (str(form, "reportCopySent") !== "yes") return;
   const [worker, job, employer] = await Promise.all([store.table("workers").get(row.workerId), store.table("jobs").get(row.jobId), store.table("employers").get(row.employerId)]);
   await store.table("screenings").upsert({ ...row, status: "pre_adverse", preAdverseAt: nowISO(), reportCopySent: true, updatedAt: nowISO() });
+  await audit(await who(), "screening.pre_adverse", "screening", row.id, `Sent pre-adverse notice (${row.kind}); report copy + Summary of Rights confirmed sent`);
   if (worker && job) {
     const es = worker.lang === "es";
     const kind = KIND_LABEL[row.kind][worker.lang].toLowerCase();
@@ -167,9 +186,10 @@ export async function sendPreAdverseNotice(form: FormData) {
 /** Staff: FCRA step 2 — final notice, only after the waiting period. Takes the worker off this job. */
 export async function sendFinalAdverseNotice(form: FormData) {
   const { store, row } = await load(form);
-  if (!row || !canSendFinalNotice(row, todayISO())) return;
+  if (!row || !canSendFinalNotice(row, todayISO(), (await getSettings()).adverseWaitDays)) return;
   const [worker, job] = await Promise.all([store.table("workers").get(row.workerId), store.table("jobs").get(row.jobId)]);
   await store.table("screenings").upsert({ ...row, status: "not_cleared", finalAdverseAt: nowISO(), updatedAt: nowISO() });
+  await audit(await who(), "screening.final_adverse", "screening", row.id, `Sent final adverse action notice (${row.kind})`);
   if (row.matchId) {
     const m = await store.table("matches").get(row.matchId);
     if (m && m.stage !== "hired") await store.table("matches").upsert({ ...m, stage: "rejected", notes: [m.notes, `Not cleared: ${row.kind} (final notice sent)`].filter(Boolean).join("\n"), updatedAt: nowISO() });
@@ -187,6 +207,7 @@ export async function cancelScreening(form: FormData) {
   const { store, row } = await load(form);
   if (!row || row.status === "clear" || row.status === "not_cleared") return;
   await store.table("screenings").upsert({ ...row, status: "canceled", updatedAt: nowISO() });
+  await audit(await who(), "screening.canceled", "screening", row.id, `Canceled ${row.kind} check`);
   refresh(row.jobId);
 }
 
@@ -204,6 +225,7 @@ export async function invoiceEmployerScreenings(form: FormData) {
     rows.map((r) => ({ id: r.id, amountUsd: r.priceUsd, description: `${KIND_LABEL[r.kind].en} — ${workers[r.workerId] ?? "worker"} (ordered ${r.orderedAt?.slice(0, 10)})` })),
   );
   for (const r of rows) await store.table("screenings").upsert({ ...r, invoiceId: inv.id, updatedAt: nowISO() });
+  await audit(await who(), "screening.invoiced", "employer", employer.id, `Invoiced ${rows.length} screening(s) to ${employer.name} (${inv.id})`);
   revalidatePath("/recruiter/screenings");
   revalidatePath("/admin/billing");
 }

@@ -7,9 +7,15 @@ import { rankCandidates, credentialStatus } from "@/lib/matching";
 import { tradeLabel } from "@/lib/taxonomy";
 import { money } from "@/lib/training";
 import type { Credential } from "@/lib/types";
+import { generatedTodos, myEmployerIds } from "@/lib/todo";
+import { ListTodo } from "lucide-react";
 
-export default async function Dashboard() {
-  await requireRole("staff");
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
+  const session = await requireRole("staff");
+  const sp = await searchParams;
+  const mineIds = await myEmployerIds(session.memberId);
+  const scopeAll = sp.scope === "all" || !mineIds;
+  const todos = await generatedTodos(scopeAll ? null : mineIds);
   const lang = await getLang();
   const store = await db();
   const today = todayISO();
@@ -27,7 +33,7 @@ export default async function Dashboard() {
   const billed = placements.filter((p) => ["invoiced", "paid"].includes(p.status)).reduce((a, p) => a + p.fee, 0);
   const pipeline = placements.filter((p) => ["active", "day30_confirmed"].includes(p.status)).reduce((a, p) => a + p.fee, 0);
   const expiring = creds.filter((c) => credentialStatus(c, today) === "expiring").length;
-  const open = jobs.filter((j) => j.status === "open").sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const open = jobs.filter((j) => j.status === "open" && (scopeAll || mineIds!.has(j.employerId))).sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   const kpis = [
     { label: "Workers signed up", value: active.length, sub: `${workers.length - active.length} mid-signup`, icon: Users, href: "/recruiter/workers" },
@@ -45,7 +51,14 @@ export default async function Dashboard() {
         subtitle="Signups, card reviews, open jobs and placement fees at a glance."
         action={
           <div className="flex gap-2">
-            <Link href="/onboard" className="btn-ghost btn-sm"><MessageSquare size={16} /> Signup simulator</Link>
+            {mineIds && (
+              <div className="flex rounded-lg bg-slate-100 p-1 text-sm font-semibold">
+                <Link href="/recruiter" className={`rounded-md px-3 py-1 ${!scopeAll ? "bg-white shadow-sm" : "text-slate-500"}`}>My accounts</Link>
+                <Link href="/recruiter?scope=all" className={`rounded-md px-3 py-1 ${scopeAll ? "bg-white shadow-sm" : "text-slate-500"}`}>All</Link>
+              </div>
+            )}
+            <Link href="/recruiter/outbox" className="btn-ghost btn-sm"><MessageSquare size={16} /> Texts</Link>
+            <Link href="/onboard" className="btn-ghost btn-sm">Signup simulator</Link>
             <Link href="/employer/jobs/new" className="btn-primary btn-sm"><Plus size={16} /> New job</Link>
           </div>
         }
@@ -66,13 +79,18 @@ export default async function Dashboard() {
         })}
       </div>
 
+      {todos.length > 0 && (
+        <Link href={scopeAll ? "/recruiter/todo?scope=all" : "/recruiter/todo"} className="mt-4 flex items-center gap-3 rounded-2xl bg-brand-soft px-4 py-3 text-sm font-semibold text-brand-dark ring-1 ring-blue-200 hover:bg-blue-100" data-testid="todo-banner">
+          <ListTodo size={18} /> {todos.length} thing(s) on your to-do list{todos.some((t) => t.urgent) ? `, ${todos.filter((t) => t.urgent).length} urgent` : ""} →
+        </Link>
+      )}
       {due.length > 0 && (
         <div className="mt-4 flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
           <AlertTriangle size={18} /> {due.length} placement(s) reached day 30. <Link href="/recruiter/placements" className="underline">Confirm they're still on the job and invoice →</Link>
         </div>
       )}
 
-      <h2 className="h2 mb-3 mt-8">Open jobs</h2>
+      <h2 className="h2 mb-3 mt-8">Open jobs{!scopeAll ? " — my accounts" : ""}</h2>
       <div className="card overflow-x-auto p-0 sm:p-0">
         <table className="data">
           <thead><tr><th>Job</th><th>Employer</th><th>Start</th><th>Fit now</th><th>Pipeline</th><th>Fee</th></tr></thead>

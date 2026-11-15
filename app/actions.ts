@@ -6,6 +6,9 @@ import { redirect } from "next/navigation";
 import { db, newId, nowISO, todayISO } from "@/lib/db";
 import { requireCap, requireEmployer, requireRole, requireWorker, getLang } from "@/lib/session";
 import { can, type Capability } from "@/lib/permissions";
+import { audit } from "@/lib/audit";
+import { feeFor, getSettings } from "@/lib/settings";
+import { emailEmployer } from "@/lib/email";
 import { readCardPhoto } from "@/lib/ai/credential";
 import { sendSms } from "@/lib/messaging";
 import { createPlacementInvoice } from "@/lib/billing";
@@ -97,8 +100,13 @@ export async function updateProfile(form: FormData) {
     shifts: form.getAll("shifts").map(String) as Shift[],
     skills: form.getAll("skills").map(String),
     lang: str(form, "lang") === "es" ? "es" : "en",
+    email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(str(form, "email")) ? str(form, "email").toLowerCase() : str(form, "email") === "" ? null : w.email ?? null,
+    alerts: (["sms", "email", "none"] as const).find((a) => a === str(form, "alerts")) ?? w.alerts ?? "sms",
     onboardingComplete: true,
   };
+  if (updated.email && updated.email !== w.email && (await store.table("workers").list()).some((x) => x.id !== w.id && x.email?.toLowerCase() === updated.email)) {
+    redirect("/me/profile?err=email");
+  }
   await store.table("workers").upsert(updated);
   revalidatePath("/me");
   redirect("/me");
@@ -124,13 +132,6 @@ export async function expressInterest(form: FormData) {
 
 // ---------------- Employer ----------------
 
-/** Plan pricing (estimates to test): $3,000 entry/helper, $4,000 mid, $5,000 journey-level. */
-function defaultFee(j: Pick<Job, "trade" | "minYears" | "minNccerLevel" | "requiredCredentials">): number {
-  if (j.trade === "helper" || j.minYears < 2) return 3000;
-  if (j.minNccerLevel >= 3 || j.minYears >= 5 || j.requiredCredentials.some((c) => c.includes("journeyman") || c.includes("master"))) return 5000;
-  return 4000;
-}
-
 export async function createJob(form: FormData) {
   const s = await requireRole("employer");
   const employerId = isStaffRole(s.role) ? str(form, "employerId") : s.employerId!;
@@ -149,11 +150,52 @@ export async function createJob(form: FormData) {
     requiresBackground: str(form, "requiresBackground") === "on", requiresDrug: str(form, "requiresDrug") === "on",
     status: "open", description: str(form, "description"), createdAt: nowISO(),
   };
-  job.placementFee = Number(str(form, "placementFee")) || defaultFee(job);
+  job.placementFee = Number(str(form, "placementFee")) || feeFor(job, await getSettings());
   await store.table("jobs").upsert(job);
+  await audit(s, "job.created", "job", job.id, `Posted "${job.title}" (${job.headcount} opening(s), starts ${job.startDate})`);
   revalidatePath("/employer");
   revalidatePath("/recruiter");
   redirect(isStaffRole(s.role) ? `/recruiter/jobs/${job.id}` : `/employer/jobs/${job.id}?new=1`);
+}
+
+/** Employer (own jobs) or staff: change a job. The placement fee stays as agreed. */
+export async function updateJob(form: FormData) {
+  const s = await requireRole("employer");
+  const store = await db();
+  const job = await store.table("jobs").get(str(form, "id"));
+  if (!job || (!isStaffRole(s.role) && job.employerId !== s.employerId)) return;
+  const trade = TRADE_BY_ID[str(form, "trade")] ? str(form, "trade") : job.trade;
+  const updated: Job = {
+    ...job, trade, title: str(form, "title") || job.title,
+    requiredCredentials: form.getAll("requiredCredentials").map(String).filter((c) => CREDENTIAL_BY_ID[c]),
+    preferredCredentials: form.getAll("preferredCredentials").map(String).filter((c) => CREDENTIAL_BY_ID[c]),
+    requiredSkills: form.getAll("requiredSkills").map(String),
+    minNccerLevel: Number(str(form, "minNccerLevel") || 0), minYears: Number(str(form, "minYears") || 0),
+    payMin: Number(str(form, "payMin") || job.payMin), payMax: Number(str(form, "payMax") || job.payMax),
+    shift: (str(form, "shift") || job.shift) as Shift, zip: /^\d{5}$/.test(str(form, "zip")) ? str(form, "zip") : job.zip,
+    startDate: date(form, "startDate") ?? job.startDate, headcount: Math.max(1, Number(str(form, "headcount") || job.headcount)),
+    requiresBackground: str(form, "requiresBackground") === "on", requiresDrug: str(form, "requiresDrug") === "on",
+    description: str(form, "description"),
+  };
+  await store.table("jobs").upsert(updated);
+  await audit(s, "job.updated", "job", job.id, `Edited "${updated.title}"`);
+  revalidatePath(`/employer/jobs/${job.id}`);
+  revalidatePath(`/recruiter/jobs/${job.id}`);
+  redirect(isStaffRole(s.role) ? `/recruiter/jobs/${job.id}` : `/employer/jobs/${job.id}`);
+}
+
+/** Close a job (no more matching) or reopen it. */
+export async function setJobStatus(form: FormData) {
+  const s = await requireRole("employer");
+  const store = await db();
+  const job = await store.table("jobs").get(str(form, "id"));
+  if (!job || (!isStaffRole(s.role) && job.employerId !== s.employerId)) return;
+  const status = str(form, "status") === "closed" ? "closed" : "open";
+  await store.table("jobs").upsert({ ...job, status });
+  await audit(s, status === "closed" ? "job.closed" : "job.reopened", "job", job.id, `${status === "closed" ? "Closed" : "Reopened"} "${job.title}"`);
+  revalidatePath(`/employer/jobs/${job.id}`);
+  revalidatePath("/employer");
+  revalidatePath("/recruiter");
 }
 
 export async function employerRespond(form: FormData) {
@@ -165,6 +207,7 @@ export async function employerRespond(form: FormData) {
   if (!job || job.employerId !== s.employerId || m.stage !== "sent") return;
   const stage = str(form, "stage") === "interview" ? "interview" : "rejected";
   await store.table("matches").upsert({ ...m, stage, notes: [m.notes, `Employer: ${stage === "interview" ? "requested interview" : "passed"}${str(form, "note") ? " — " + str(form, "note") : ""}`].filter(Boolean).join("\n"), updatedAt: nowISO() });
+  await audit(s, `match.employer_${stage}`, "match", m.id, `${stage === "interview" ? "Requested interview" : "Passed"} on a candidate for "${job.title}"`);
   revalidatePath(`/employer/jobs/${job.id}`);
 }
 
@@ -182,25 +225,29 @@ async function withCap(cap: Capability) {
 }
 
 export async function shortlist(form: FormData) {
-  const { store } = await staff();
+  const { s, store } = await staff();
   const jobId = str(form, "jobId");
   const workerId = str(form, "workerId");
   const existing = (await store.table("matches").list({ jobId } as Partial<Match>)).find((m) => m.workerId === workerId);
   if (!existing) {
-    await store.table("matches").upsert({ id: newId(), jobId, workerId, stage: "shortlisted", score: Number(str(form, "score") || 0), notes: "", createdAt: nowISO(), updatedAt: nowISO() });
+    const id = newId();
+    await store.table("matches").upsert({ id, jobId, workerId, stage: "shortlisted", score: Number(str(form, "score") || 0), notes: "", createdAt: nowISO(), updatedAt: nowISO() });
+    await audit(s, "match.shortlisted", "match", id, `Shortlisted worker ${workerId} for job ${jobId}`);
   }
   revalidatePath(`/recruiter/jobs/${jobId}`);
 }
 
 export async function setMatchStage(form: FormData) {
-  const { store } = await staff();
+  const { s, store } = await staff();
   const m = await store.table("matches").get(str(form, "matchId"));
   if (!m) return;
   const stage = str(form, "stage") as MatchStage;
   if (!["shortlisted", "sent", "interview", "rejected"].includes(stage)) return;
   await store.table("matches").upsert({ ...m, stage, notes: str(form, "notes") || m.notes, updatedAt: nowISO() });
+  await audit(s, "match.stage", "match", m.id, `Moved to ${stage} (job ${m.jobId}, worker ${m.workerId})`);
   if (stage === "sent") {
     const [job, worker] = await Promise.all([store.table("jobs").get(m.jobId), store.table("workers").get(m.workerId)]);
+    if (job) await emailEmployer(job.employerId, `New candidate for ${job.title}`, `A recruiter sent you a checked candidate for "${job.title}". Review them and request an interview: ${appUrl()}/employer/jobs/${job.id}`);
     if (job && worker?.consentSms) {
       const es = worker.lang === "es";
       await sendSms(worker.phone, es
@@ -243,7 +290,7 @@ export async function textTopMatches(form: FormData) {
 }
 
 export async function markHired(form: FormData) {
-  const { store } = await staff();
+  const { s, store } = await staff();
   const m = await store.table("matches").get(str(form, "matchId"));
   if (!m) return;
   const job = await store.table("jobs").get(m.jobId);
@@ -254,12 +301,14 @@ export async function markHired(form: FormData) {
   const gate = hireGate(job, await store.table("screenings").list({ workerId: m.workerId } as never), todayISO());
   if (!gate.ok) return;
   await store.table("matches").upsert({ ...m, stage: "hired", updatedAt: nowISO() });
+  const cfg = await getSettings();
   const p: Placement = {
     id: newId(), matchId: m.id, jobId: job.id, workerId: m.workerId, employerId: job.employerId, startDate,
-    day30Date: addDays(startDate, 30), guaranteeEndsOn: addDays(startDate, 90), fee: job.placementFee, status: "active",
+    day30Date: addDays(startDate, cfg.feeDueDay), guaranteeEndsOn: addDays(startDate, cfg.guaranteeDays), fee: job.placementFee, status: "active",
     invoiceId: null, invoiceUrl: null, createdAt: nowISO(),
   };
   await store.table("placements").upsert(p);
+  await audit(s, "placement.hired", "placement", p.id, `Hired worker ${m.workerId} for "${job.title}", starts ${startDate}, fee $${p.fee}`);
   const hired = (await store.table("matches").list({ jobId: job.id } as Partial<Match>)).filter((x) => x.stage === "hired").length;
   if (hired >= job.headcount) await store.table("jobs").upsert({ ...job, status: "filled" });
   revalidatePath(`/recruiter/jobs/${job.id}`);
@@ -274,6 +323,7 @@ export async function updatePlacement(form: FormData) {
   const action = str(form, "action");
   // Recruiters confirm day 30 and record early leavers; invoicing and payments are admin-only.
   if ((action === "invoice" || action === "paid") && !can(s.role, "bill")) return;
+  await audit(s, `placement.${action}`, "placement", p.id, `Placement ${p.id}: ${action}`);
   if (action === "confirm") {
     await store.table("placements").upsert({ ...p, status: "day30_confirmed" });
   } else if (action === "invoice") {
@@ -281,6 +331,7 @@ export async function updatePlacement(form: FormData) {
     if (!employer || !job || !worker) return;
     const inv = await createPlacementInvoice(p, employer, job, worker);
     await store.table("placements").upsert({ ...p, status: "invoiced", invoiceId: inv.id, invoiceUrl: inv.url });
+    await emailEmployer(p.employerId, `Invoice for ${worker.name.split(" ")[0]} — ${job.title}`, `Your placement fee of $${p.fee} is due in 15 days.${inv.url ? ` View and pay: ${inv.url}` : ""}\nAll hires and invoices: ${appUrl()}/employer/hires`);
   } else if (action === "paid") {
     await store.table("placements").upsert({ ...p, status: "paid" });
   } else if (action === "left") {
@@ -298,6 +349,7 @@ export async function reviewCredential(form: FormData) {
   const c = await store.table("credentials").get(str(form, "id"));
   if (!c) return;
   const decision = str(form, "decision");
+  await audit(s, `card.${decision === "reject" ? "rejected" : decision === "verify" ? "verified" : "updated"}`, "credential", c.id, `${decision === "reject" ? "Rejected" : decision === "verify" ? "Verified" : "Updated"} ${str(form, "type") || c.type} for worker ${c.workerId}${str(form, "method") ? ` (${str(form, "method")})` : ""}`);
   if (decision === "reject") {
     await store.table("credentials").remove(c.id);
   } else {
@@ -306,7 +358,7 @@ export async function reviewCredential(form: FormData) {
       ...c, type, number: str(form, "number") || null, issuedOn: date(form, "issuedOn"), expiresOn: date(form, "expiresOn"),
       needsReview: false,
       ...(decision === "verify"
-        ? { verification: "verified" as const, verifiedBy: s.userId ?? "Demo recruiter", verifiedMethod: str(form, "method") || CREDENTIAL_BY_ID[type]?.verifyHow || "Checked" }
+        ? { verification: "verified" as const, verifiedBy: s.actor, verifiedMethod: str(form, "method") || CREDENTIAL_BY_ID[type]?.verifyHow || "Checked" }
         : {}),
     };
     await store.table("credentials").upsert(updated);
@@ -316,10 +368,12 @@ export async function reviewCredential(form: FormData) {
 }
 
 export async function createEmployer(form: FormData) {
-  const { store } = await withCap("manageEmployers");
+  const { s, store } = await withCap("manageEmployers");
   const name = str(form, "name");
   if (!name) return;
-  await store.table("employers").upsert({ id: newId(), name, contactName: str(form, "contactName"), email: str(form, "email").toLowerCase(), phone: str(form, "phone"), zip: str(form, "zip"), createdAt: nowISO() });
+  const id = newId();
+  await store.table("employers").upsert({ id, name, contactName: str(form, "contactName"), email: str(form, "email").toLowerCase(), phone: str(form, "phone"), zip: str(form, "zip"), recruiterId: str(form, "recruiterId") || null, createdAt: nowISO() });
+  await audit(s, "employer.created", "employer", id, `Added employer ${name}`);
   revalidatePath("/admin/employers");
 }
 
@@ -332,7 +386,7 @@ export async function runRemindersNow() {
 // ---------------- Training directory (staff) ----------------
 
 export async function saveProgram(form: FormData) {
-  const { store } = await withCap("manageTraining");
+  const { s, store } = await withCap("manageTraining");
   const id = str(form, "id") || newId();
   const numOrNull = (k: string) => (str(form, k) === "" ? null : Number(str(form, k)));
   const existing = await store.table("training_programs").get(id);
@@ -357,15 +411,19 @@ export async function saveProgram(form: FormData) {
     requirementNote: str(form, "requirementNote") || null,
     // Saving is the review: whoever edits the program has just checked it.
     reviewedOn: todayISO(),
+    providerId: existing?.providerId ?? null,
+    status: str(form, "status") === "pending" ? "pending" : "published",
   });
+  await audit(s, existing ? "training.updated" : "training.created", "training", id, `${existing ? "Updated" : "Added"} training "${str(form, "name")}"`);
   revalidatePath("/admin/training");
   revalidatePath("/training");
   redirect("/admin/training");
 }
 
 export async function deleteProgram(form: FormData) {
-  const { store } = await withCap("manageTraining");
+  const { s, store } = await withCap("manageTraining");
   await store.table("training_programs").remove(str(form, "id"));
+  await audit(s, "training.deleted", "training", str(form, "id"), `Deleted training ${str(form, "id")}`);
   revalidatePath("/admin/training");
   revalidatePath("/training");
 }
@@ -384,4 +442,44 @@ export async function shortlistPlan(form: FormData) {
   }
   revalidatePath("/recruiter/optimize");
   revalidatePath("/recruiter");
+}
+
+/**
+ * Worker: delete my account. Removes cards (and photos), signup chats, messages and matches.
+ * If they were ever placed, the placement and screening outcome rows are kept for billing and
+ * legal records, but the profile is stripped of everything that identifies them.
+ */
+export async function deleteMyAccount(form: FormData) {
+  const s = await requireWorker();
+  if (str(form, "confirm").toUpperCase() !== "DELETE") redirect("/me/profile?del=confirm");
+  const store = await db();
+  const w = await store.table("workers").get(s.workerId);
+  if (!w) redirect("/");
+  for (const c of await store.table("credentials").list({ workerId: w.id } as Partial<Credential>)) {
+    if (c.photoPath) await store.removeFile(c.photoPath).catch(() => {});
+    await store.table("credentials").remove(c.id);
+  }
+  for (const x of (await store.table("onboarding_sessions").list()).filter((x) => x.workerId === w.id)) await store.table("onboarding_sessions").remove(x.id);
+  for (const m of (await store.table("outbox").list()).filter((m) => m.to === w.phone || (w.email && m.to === w.email))) await store.table("outbox").remove(m.id);
+  const placed = (await store.table("placements").list({ workerId: w.id } as Partial<Placement>)).length > 0;
+  for (const m of await store.table("matches").list({ workerId: w.id } as Partial<Match>)) if (!placed || m.stage !== "hired") await store.table("matches").remove(m.id);
+  if (placed) {
+    await store.table("workers").upsert({
+      ...w, name: "Deleted worker", phone: `deleted:${w.id}`, email: null, zip: null, lat: null, lng: null, skills: [], summary: "",
+      consentSms: false, alerts: "none", onboardingComplete: false,
+    });
+  } else {
+    for (const x of await store.table("screenings").list({ workerId: w.id } as never)) await store.table("screenings").remove(x.id);
+    await store.table("workers").remove(w.id);
+  }
+  await audit({ role: "worker", actor: `worker ${w.id}` }, "worker.deleted", "worker", w.id, placed ? "Worker deleted their account (anonymized; placement records kept)" : "Worker deleted their account");
+  if (s.userId) {
+    const { createClient } = await import("@supabase/supabase-js");
+    const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    await admin.auth.admin.deleteUser(s.userId).catch(() => {});
+  }
+  const { cookies } = await import("next/headers");
+  const jar = await cookies();
+  for (const c of ["cp_token", "cp_refresh", "cp_role", "cp_worker", "cp_webkey", "cp_loc"]) jar.delete(c);
+  redirect("/?deleted=1");
 }

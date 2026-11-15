@@ -5,7 +5,7 @@
 
 import "server-only";
 import type {
-  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TeamMember, TrainingProgram, Worker,
+  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TeamMember, TrainingProgram, Worker, AuditEntry, AppSetting, Task, EmployerUser, Provider,
 } from "../types";
 
 export interface Rows {
@@ -20,6 +20,11 @@ export interface Rows {
   outbox: OutboxMessage;
   screenings: Screening;
   team_members: TeamMember;
+  audit_log: AuditEntry;
+  app_settings: AppSetting;
+  tasks: Task;
+  employer_users: EmployerUser;
+  providers: Provider;
 }
 export type TableName = keyof Rows;
 
@@ -35,6 +40,7 @@ export interface Store {
   table<N extends TableName>(name: N): Table<Rows[N]>;
   saveFile(path: string, bytes: Uint8Array, contentType: string): Promise<string>;
   readFile(path: string): Promise<{ bytes: Uint8Array; contentType: string } | null>;
+  removeFile(path: string): Promise<void>;
 }
 
 export const isDemo = () => !(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);

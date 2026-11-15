@@ -72,6 +72,10 @@ export async function createMemoryStore(): Promise<Store> {
       await fs.writeFile(full + ".type", contentType);
       return p;
     },
+    async removeFile(p) {
+      const full = path.join(UPLOADS, path.normalize(p).replace(/^(\.\.[/\\])+/, ""));
+      await Promise.all([fs.rm(full, { force: true }), fs.rm(full + ".type", { force: true })]);
+    },
     async readFile(p) {
       const full = path.join(UPLOADS, path.normalize(p).replace(/^(\.\.[/\\])+/, ""));
       try {

@@ -6,6 +6,7 @@ import { PageHeader, Shell, adminNav } from "@/components/Shell";
 import { money, needsReview } from "@/lib/training";
 import { billable } from "@/lib/screening/policy";
 import { integrations } from "@/lib/integrations";
+import { getSettings } from "@/lib/settings";
 
 export default async function AdminOverview() {
   await requireCap("settings");
@@ -17,6 +18,7 @@ export default async function AdminOverview() {
     store.table("placements").list(), store.table("employers").list(), store.table("screenings").list(), store.table("training_programs").list(),
     store.table("team_members").list(),
   ]);
+  const cfg = await getSettings();
 
   const sumFees = (st: string[]) => placements.filter((p) => st.includes(p.status)).reduce((a, p) => a + p.fee, 0);
   const screeningBilled = screenings.filter((s) => s.invoiceId).reduce((a, s) => a + s.priceUsd, 0);
@@ -50,7 +52,7 @@ export default async function AdminOverview() {
     { n: screenings.filter((s) => s.status === "needs_review" || s.status === "pre_adverse").length, label: "flagged screenings", href: "/recruiter/screenings" },
     { n: placements.filter((p) => p.status === "active" && p.day30Date <= today).length, label: "placements past day 30, not confirmed", href: "/recruiter/placements" },
     { n: toBill, label: "items ready to invoice", href: "/admin/billing" },
-    { n: programs.filter((p) => needsReview(p, today)).length, label: "training programs due for a requirements check", href: "/admin/training" },
+    { n: programs.filter((p) => needsReview(p, today, cfg.trainingReviewDays)).length, label: "training programs due for a requirements check", href: "/admin/training" },
     { n: !isDemo() && demoRows ? demoRows : 0, label: "demo employers still in the live database", href: "/admin/settings" },
     { n: missing.length, label: "integrations not connected", href: "/admin/settings" },
   ].filter((a) => a.n > 0);

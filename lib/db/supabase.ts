@@ -55,6 +55,9 @@ export function createSupabaseStore(): Store {
       if (error) throw new Error(`storage.upload: ${error.message}`);
       return path;
     },
+    async removeFile(path) {
+      await client.storage.from(BUCKET).remove([path]);
+    },
     async readFile(path) {
       const { data, error } = await client.storage.from(BUCKET).download(path);
       if (error || !data) return null;

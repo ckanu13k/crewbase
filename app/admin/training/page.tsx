@@ -3,28 +3,48 @@ import { requireCap, getLang } from "@/lib/session";
 import { db, todayISO } from "@/lib/db";
 import { Shell, adminNav } from "@/components/Shell";
 import { CREDENTIALS, SKILLS, TRADES, credShort } from "@/lib/taxonomy";
+import { getSettings } from "@/lib/settings";
 import { FUNDING_LABEL, money, needsReview, programServesJob, sortPrograms, REVIEW_EVERY_DAYS } from "@/lib/training";
 import { deleteProgram, saveProgram } from "@/app/actions";
+import { createProvider, setProgramStatus } from "@/app/provider-actions";
 import type { Funding } from "@/lib/types";
 
-export default async function TrainingAdmin({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+export default async function TrainingAdmin({ searchParams }: { searchParams: Promise<{ edit?: string; perr?: string }> }) {
   await requireCap("manageTraining");
   const sp = await searchParams;
   const lang = await getLang();
   const store = await db();
   const today = todayISO();
+  const cfg = await getSettings();
   const programs = sortPrograms(await store.table("training_programs").list(), today);
   const jobs = (await store.table("jobs").list()).filter((j) => j.status === "open");
   const demand = (x: (typeof programs)[number]) => jobs.filter((j) => programServesJob(x, j)).reduce((a, j) => a + j.headcount, 0);
   programs.sort((a, b) => demand(b) - demand(a));
   const p = sp.edit ? programs.find((x) => x.id === sp.edit) : undefined;
+  const providers = await store.table("providers").list();
+  const providerName = Object.fromEntries(providers.map((x) => [x.id, x.name]));
+  const pending = programs.filter((x) => x.status === "pending");
 
   return (
     <Shell lang={lang} nav={adminNav} back="/admin/training" wide>
       <h1 className="h1">Training directory</h1>
       <p className="muted mb-4">
-        What workers see under Training and in “what you're missing”, ranked by how many open positions ask for what each program gives. When an employer or regulator changes a requirement, edit the program here: saving marks it reviewed today. Programs not reviewed in {REVIEW_EVERY_DAYS} days are flagged.
+        What workers see under Training and in “what you're missing”, ranked by how many open positions ask for what each program gives. When an employer or regulator changes a requirement, edit the program here: saving marks it reviewed today. Programs not reviewed in {cfg.trainingReviewDays} days are flagged.
       </p>
+      {pending.length > 0 && (
+        <div className="card mb-4" data-testid="pending-programs">
+          <h2 className="h2 mb-2">Waiting for approval ({pending.length})</h2>
+          {pending.map((x) => (
+            <div key={x.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 py-2 last:border-0">
+              <span><b>{x.name}</b> <span className="muted">· {x.providerId ? providerName[x.providerId] : x.provider} · {x.city} · starts {x.nextStart ?? "—"} · {money(x.costUsd)}</span></span>
+              <span className="flex gap-1">
+                <Link href={`/admin/training?edit=${x.id}`} className="btn-ghost btn-sm">Check</Link>
+                <form action={setProgramStatus}><input type="hidden" name="id" value={x.id} /><input type="hidden" name="status" value="published" /><button className="btn-primary btn-sm">Approve</button></form>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
         <div className="card overflow-x-auto">
           <table className="data">
@@ -33,12 +53,12 @@ export default async function TrainingAdmin({ searchParams }: { searchParams: Pr
               {programs.length === 0 && <tr><td colSpan={7} className="muted">No programs yet.</td></tr>}
               {programs.map((x) => (
                 <tr key={x.id} className={x.nextStart && x.nextStart < today ? "opacity-60" : ""}>
-                  <td className="font-semibold">{x.name}<div className="muted">{x.provider} · {x.city}{x.sample ? " · sample" : ""}</div></td>
+                  <td className="font-semibold">{x.name}{x.status === "pending" && <span className="pill ml-1 bg-amber-50 text-amber-800">pending</span>}<div className="muted">{x.provider} · {x.city}{x.sample ? " · sample" : ""}{x.providerId ? " · managed by provider" : ""}</div></td>
                   <td className="font-semibold">{demand(x)}</td>
                   <td className={!x.nextStart || x.nextStart < today ? "text-amber-700" : ""}>{x.nextStart ?? "add date"}</td>
                   <td>{money(x.costUsd)}</td>
                   <td className="text-xs">{[...x.coversCredentials.map(credShort), ...(x.nccerLevel ? [`NCCER ${x.nccerLevel}`] : [])].join(", ") || "—"}{x.coversSkills.length ? ` +${x.coversSkills.length} skills` : ""}</td>
-                  <td className={`text-xs ${needsReview(x, today) ? "font-semibold text-amber-700" : "text-slate-500"}`}>{x.reviewedOn ?? "never"}{needsReview(x, today) ? " · review" : ""}</td>
+                  <td className={`text-xs ${needsReview(x, today, cfg.trainingReviewDays) ? "font-semibold text-amber-700" : "text-slate-500"}`}>{x.reviewedOn ?? "never"}{needsReview(x, today, cfg.trainingReviewDays) ? " · review" : ""}</td>
                   <td className="whitespace-nowrap">
                     <Link href={`/admin/training?edit=${x.id}`} className="btn-ghost btn-sm">Edit</Link>
                     <form action={deleteProgram} className="inline"><input type="hidden" name="id" value={x.id} /><button className="btn-sm text-slate-400 hover:text-red-600">✕</button></form>
@@ -88,6 +108,26 @@ export default async function TrainingAdmin({ searchParams }: { searchParams: Pr
             {p && <Link href="/admin/training" className="btn-ghost">Cancel</Link>}
           </div>
         </form>
+      </div>
+      <div className="card mt-6" data-testid="providers">
+        <h2 className="h2 mb-1">Training providers</h2>
+        <p className="muted mb-3">A provider's contact email signs in to manage their own classes. New classes they add wait for approval here.</p>
+        <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+          <table className="data">
+            <thead><tr><th>Provider</th><th>Signs in with</th><th>Classes</th></tr></thead>
+            <tbody>
+              {providers.length === 0 && <tr><td colSpan={3} className="muted">None yet.</td></tr>}
+              {providers.map((x) => <tr key={x.id}><td className="font-semibold">{x.name}</td><td>{x.contactEmail}</td><td>{programs.filter((pr) => pr.providerId === x.id).length}</td></tr>)}
+            </tbody>
+          </table>
+          <form action={createProvider} className="space-y-2">
+            {sp.perr && <p className="text-sm text-amber-700">Name and a valid email are required.</p>}
+            <input name="name" required placeholder="Provider name" className="input" />
+            <input name="email" type="email" required placeholder="Contact email" className="input" />
+            <input name="website" placeholder="Website (https://…)" className="input" />
+            <button className="btn-primary w-full">Add provider</button>
+          </form>
+        </div>
       </div>
     </Shell>
   );

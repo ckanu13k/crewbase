@@ -4,6 +4,7 @@ import { db, todayISO } from "@/lib/db";
 import { Shell, employerNav } from "@/components/Shell";
 import { tradeLabel } from "@/lib/taxonomy";
 import { rankCandidates } from "@/lib/matching";
+import { getSettings } from "@/lib/settings";
 import type { Credential, Job, Match } from "@/lib/types";
 
 export default async function EmployerHome() {
@@ -11,6 +12,7 @@ export default async function EmployerHome() {
   const lang = await getLang();
   const store = await db();
   const today = todayISO();
+  const cfg = await getSettings();
   const [employer, jobs, workers, creds, matches] = await Promise.all([
     store.table("employers").get(s.employerId),
     store.table("jobs").list({ employerId: s.employerId } as Partial<Job>),
@@ -27,7 +29,7 @@ export default async function EmployerHome() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="h1">{employer?.name}</h1>
-          <p className="muted">Flat fee per direct hire, due on the worker's 30th day. Free replacement within 90 days.</p>
+          <p className="muted">Flat fee per direct hire, due on the worker's day {cfg.feeDueDay}. Free replacement within {cfg.guaranteeDays} days.</p>
         </div>
         <Link href="/employer/jobs/new" className="btn-primary">Post a job</Link>
       </div>

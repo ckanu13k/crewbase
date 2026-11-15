@@ -13,12 +13,12 @@ export async function POST(req: Request) {
     const { resetMemoryStore } = await import("@/lib/db/memory");
     await resetMemoryStore();
     const res = NextResponse.redirect(new URL("/", req.url), 303);
-    for (const c of ["cp_role", "cp_worker", "cp_employer", "cp_webkey"]) res.cookies.delete(c);
+    for (const c of ["cp_role", "cp_worker", "cp_employer", "cp_webkey", "cp_provider", "cp_member"]) res.cookies.delete(c);
     return res;
   }
   if (action === "logout") {
     const res = NextResponse.redirect(new URL("/", req.url), 303);
-    for (const c of ["cp_role", "cp_worker", "cp_employer", "cp_webkey"]) res.cookies.delete(c);
+    for (const c of ["cp_role", "cp_worker", "cp_employer", "cp_webkey", "cp_provider", "cp_member"]) res.cookies.delete(c);
     return res;
   }
 
@@ -33,5 +33,7 @@ export async function POST(req: Request) {
     if (lang === "es" || lang === "en") res.cookies.set("cp_lang", lang, { ...opts, httpOnly: false });
   }
   if (role === "employer") res.cookies.set("cp_employer", String(form.get("employerId") ?? "e1"), opts);
+  if (role === "provider") res.cookies.set("cp_provider", String(form.get("providerId") ?? "pr1"), opts);
+  if (role === "admin" || role === "recruiter") res.cookies.set("cp_member", String(form.get("memberId") ?? (role === "admin" ? "tm1" : "tm2")), opts);
   return res;
 }

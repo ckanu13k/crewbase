@@ -21,6 +21,10 @@ export default async function WorkerHome() {
   if (!worker || !worker.onboardingComplete) redirect("/onboard");
   const es = lang === "es";
   const loc = await getUserLocation(worker);
+  const lastSeen = worker.lastSeenAt ?? null;
+  const isNew = (createdAt: string) => Boolean(lastSeen && createdAt > lastSeen);
+  // Remember this visit so next time only newer jobs are marked "new".
+  void (await db()).table("workers").upsert({ ...worker, lastSeenAt: new Date().toISOString() });
   const toAuthorize = (await (await db()).table("screenings").list({ workerId: worker.id } as never)).filter((x) => x.status === "awaiting_consent").length;
 
   const alerts = creds.filter((c) => ["expired", "expiring"].includes(credentialStatus(c, today)));
@@ -117,7 +121,7 @@ export default async function WorkerHome() {
           <Link key={job.id} href={`/me/jobs/${job.id}`} className="card card-hover block">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[17px] font-semibold">{job.title}</div>
+                <div className="text-[17px] font-semibold">{job.title}{isNew(job.createdAt) && <span className="pill ml-2 bg-emerald-50 align-middle text-emerald-700 ring-1 ring-emerald-200" data-testid="new-job">{es ? "Nuevo" : "New"}</span>}</div>
                 <div className="truncate text-sm text-slate-500">{employer}</div>
               </div>
               <ScorePill score={result.score} eligible />

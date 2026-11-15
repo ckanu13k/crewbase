@@ -20,7 +20,7 @@ Demo mode uses fictional sample workers, employers, jobs and training programs (
 
 ## Go live (Vercel + Supabase)
 
-1. **Supabase**: create a project. In the SQL editor run `supabase/migrations/0001_init.sql`, `0002_rate_limits.sql`, `0003_locations.sql`, `0004_screenings.sql`, then `0005_team_roles.sql` (or all at once: `supabase/setup.sql`). Optional demo board: run `supabase/demo-data.sql` (25 fictional workers, 6 employers, 11 jobs, 10 training programs; regenerate with `npm run demo:sql`). Demo phone numbers are in the reserved 555-01xx range and are never texted.
+1. **Supabase**: create a project. In the SQL editor run `supabase/migrations/0001_init.sql`, `0002_rate_limits.sql`, `0003_locations.sql`, `0004_screenings.sql`, `0005_team_roles.sql`, then `0006_personas_plus.sql` (or all at once: `supabase/setup.sql`). Optional demo board: run `supabase/demo-data.sql` (25 fictional workers, 6 employers, 11 jobs, 10 training programs; regenerate with `npm run demo:sql`). Demo phone numbers are in the reserved 555-01xx range and are never texted.
    - Auth → Providers → **Email**: on. Auth → Email templates → **Magic link**: include `{{ .Token }}` so people get a 6-digit code (the sign-in screen asks for a code, not a link).
    - Auth → Providers → **Phone**: on, provider **Twilio Verify** (no A2P 10DLC needed for Verify codes).
    - Auth → URL configuration: set the Site URL to your Vercel URL.
@@ -57,13 +57,14 @@ Sign-in: workers use their phone (one-time code); employers and staff use email 
 
 | Persona | Lands on | Can do | Can't do |
 | --- | --- | --- | --- |
-| **Admin** (owner) | `/admin` | Everything below, plus revenue overview, **Billing** (placement + screening invoices, mark paid), **Team** (add recruiters/admins), **Employers** (accounts that can sign in), **Training** directory, **Settings** (integrations, defaults, demo data) | — |
-| **Recruiter** | `/recruiter` | Pipeline, Optimizer, card Review, Screening (request, record, review, notices), Workers, Placements (day-30 check, left early), Texts, post jobs for an employer | Invoices, payments, team, employer accounts, training directory, settings |
-| **Employer** | `/employer` | Their own jobs, shortlists (outcome-only screening status), **Hires & billing** (guarantee dates, invoices) | Other employers' data, worker contact details |
-| **Worker** | `/me` | Profile, cards, matched jobs, screening authorization, training, practice | Anything about other people |
+| **Admin** (owner) | `/admin` | Everything below, plus revenue overview, **Billing**, **Employers** (accounts + recruiter assignment), **Team**, **Activity** (audit log), **Training** (+ providers, approvals), **Settings** (integrations, editable business defaults, delete demo data) | — |
+| **Recruiter** | `/recruiter` | **To-do** (generated + personal), My accounts / All, Pipeline, Optimizer, card Review, Screening, Workers, Placements (day-30 check, left early), Texts, post/edit jobs | Invoices, payments, team, employer accounts, training directory, settings |
+| **Employer** | `/employer` | Their jobs (post, edit, close/reopen), shortlists, **Hires & billing**, **Team** (contact adds hiring managers); email alerts for new candidates, clear screenings, invoices | Other employers' data, worker contact details |
+| **Worker** | `/me` | Profile, cards, matched jobs ("New" since last visit), screening authorization, training, practice; sign in by phone **or email**; job alerts by text/email/off; download my data; delete my account | Anything about other people |
+| **Training provider** | `/provider` | Their own class listings (dates, cost, requirements), local demand for what they teach (aggregate only); new classes wait for admin approval | Anyone else's listings, any worker identity |
 | **Visitor** | `/` | Landing, training directory, practice quizzes, sign-up | — |
 
-Permissions live in `lib/permissions.ts` (tested). Team access is re-checked on every request, so removing someone locks them out immediately.
+Permissions live in `lib/permissions.ts` (tested). Every important action (card checks, screening steps, hires, invoices, team/settings changes, deletions) is written to the activity log (`lib/audit.ts`), never with report contents or card numbers. Team access is re-checked on every request, so removing someone locks them out immediately.
 
 ## Matching and location
 

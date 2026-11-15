@@ -11,7 +11,8 @@ import { tradeLabel } from "@/lib/taxonomy";
 import { Shell } from "@/components/Shell";
 import { Logo } from "@/components/Logo";
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
+  const { deleted } = await searchParams;
   const lang = await getLang();
   const es = lang === "es";
   const demo = isDemo();
@@ -37,6 +38,7 @@ export default async function Home() {
 
   return (
     <Shell lang={lang} back="/" bare>
+      {deleted && <div className="bg-emerald-600 px-4 py-2 text-center text-sm font-semibold text-white">Your account was deleted. Thank you for using CrewPass.</div>}
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-br from-brand-deep via-blue-800 to-blue-600 text-white">
         <div className="pointer-events-none absolute -top-32 -right-24 h-96 w-96 rounded-full bg-blue-400/30 blur-3xl" />
@@ -206,6 +208,14 @@ export default async function Home() {
                   ))}
                 </div>
               </div>
+              <div className="card">
+                <div className="flex items-center gap-2 font-semibold"><GraduationCap size={18} className="text-brand" /> A training provider</div>
+                <form action="/api/demo" method="post" className="mt-3">
+                  <input type="hidden" name="role" value="provider" />
+                  <input type="hidden" name="providerId" value="pr1" />
+                  <button className="btn-ghost btn-sm w-full justify-start">Ship Channel Safety Council (demo)</button>
+                </form>
+              </div>
               <div className="card bg-gradient-to-br from-brand-deep to-blue-700 text-white">
                 <div className="font-semibold">Our team</div>
                 <p className="mt-1 text-sm text-blue-100">Recruiters match and screen; admins also run billing, the team and settings.</p>
@@ -213,6 +223,11 @@ export default async function Home() {
                   <form action="/api/demo" method="post">
                     <input type="hidden" name="role" value="recruiter" />
                     <button className="btn w-full bg-white text-brand-dark hover:bg-blue-50">Open console <ArrowRight size={16} /></button>
+                  </form>
+                  <form action="/api/demo" method="post">
+                    <input type="hidden" name="role" value="recruiter" />
+                    <input type="hidden" name="memberId" value="tm3" />
+                    <button className="btn w-full bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20">Second recruiter (James)</button>
                   </form>
                   <form action="/api/demo" method="post">
                     <input type="hidden" name="role" value="admin" />

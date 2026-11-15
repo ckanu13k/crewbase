@@ -40,7 +40,7 @@ export default async function Training({ searchParams }: { searchParams: Promise
     myGaps = myGaps.filter((g, i) => myGaps.findIndex((x) => x.kind === g.kind && x.credential === g.credential && x.skill === g.skill) === i);
   }
 
-  let programs = allPrograms;
+  let programs = allPrograms.filter((p) => p.status !== "pending");
   if (sp.trade) programs = programs.filter((p) => p.trade === sp.trade || p.trade === null);
   if (sp.funding) programs = programs.filter((p) => p.funding.includes(sp.funding as Funding));
   if (sp.es) programs = programs.filter((p) => p.languages.includes("es"));

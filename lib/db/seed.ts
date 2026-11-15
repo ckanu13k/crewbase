@@ -2,7 +2,7 @@
 // Dates are relative to "today" so the demo always shows upcoming starts and expiring cards.
 
 import type {
-  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TeamMember, TrainingProgram, Worker,
+  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TeamMember, TrainingProgram, Worker, AuditEntry, AppSetting, Task, EmployerUser, Provider,
 } from "../types";
 
 const DAY = 86_400_000;
@@ -123,12 +123,12 @@ export function seedData() {
   ];
 
   const employers: Employer[] = [
-    { id: "e1", name: "Example Industrial Services (demo)", contactName: "Pat Moreno", email: "pat@example.com", phone: "+17135550151", zip: "77536", createdAt: ts(-60) },
-    { id: "e2", name: "Sample Mechanical Co. (demo)", contactName: "Dana Lee", email: "dana@example.com", phone: "+17135550152", zip: "77017", createdAt: ts(-50) },
-    { id: "e3", name: "Demo Scaffold & Access (demo)", contactName: "Ray Ortiz", email: "ray@example.com", phone: "+17135550153", zip: "77506", createdAt: ts(-45) },
-    { id: "e4", name: "Westside Fabrication (demo)", contactName: "Kim Alvarez", email: "kim@example.com", phone: "+17135550154", zip: "77449", createdAt: ts(-30) },
-    { id: "e5", name: "Golden Triangle Turnarounds (demo)", contactName: "Lee Broussard", email: "lee@example.com", phone: "+14095550155", zip: "77640", createdAt: ts(-25) },
-    { id: "e6", name: "Northside Electrical (demo)", contactName: "Sam Patel", email: "sam@example.com", phone: "+19365550156", zip: "77301", createdAt: ts(-20) },
+    { id: "e1", recruiterId: "tm2", name: "Example Industrial Services (demo)", contactName: "Pat Moreno", email: "pat@example.com", phone: "+17135550151", zip: "77536", createdAt: ts(-60) },
+    { id: "e2", recruiterId: "tm2", name: "Sample Mechanical Co. (demo)", contactName: "Dana Lee", email: "dana@example.com", phone: "+17135550152", zip: "77017", createdAt: ts(-50) },
+    { id: "e3", recruiterId: "tm3", name: "Demo Scaffold & Access (demo)", contactName: "Ray Ortiz", email: "ray@example.com", phone: "+17135550153", zip: "77506", createdAt: ts(-45) },
+    { id: "e4", recruiterId: "tm3", name: "Westside Fabrication (demo)", contactName: "Kim Alvarez", email: "kim@example.com", phone: "+17135550154", zip: "77449", createdAt: ts(-30) },
+    { id: "e5", recruiterId: "tm2", name: "Golden Triangle Turnarounds (demo)", contactName: "Lee Broussard", email: "lee@example.com", phone: "+14095550155", zip: "77640", createdAt: ts(-25) },
+    { id: "e6", recruiterId: "tm3", name: "Northside Electrical (demo)", contactName: "Sam Patel", email: "sam@example.com", phone: "+19365550156", zip: "77301", createdAt: ts(-20) },
   ];
 
   const J = (o: Partial<Job> & Pick<Job, "id" | "employerId" | "title" | "trade">): Job => ({
@@ -201,7 +201,7 @@ export function seedData() {
   // The 10 programs that unlock the most local openings. Providers are fictional; requirement notes
   // describe what Gulf Coast employers commonly ask for and are edited by staff when that changes.
   const training_programs: TrainingProgram[] = [
-    P({ id: "t1", provider: "Ship Channel Safety Council (demo)", name: "OSHA 10-Hour Construction", coversCredentials: ["osha10"], city: "Pasadena", zip: "77506",
+    P({ id: "t1", providerId: "pr1", provider: "Ship Channel Safety Council (demo)", name: "OSHA 10-Hour Construction", coversCredentials: ["osha10"], city: "Pasadena", zip: "77506",
       nextStart: d(5), weeks: 0.4, clockHours: 10, costUsd: 95, funding: ["self", "employer"], languages: ["en", "es"],
       requirementNote: "Required on day one by nearly every industrial and construction site. The DOL card does not expire, but some owners ask for a class within the last 5 years." }),
     P({ id: "t2", provider: "Bay Area Safety Training (demo)", name: "OSHA 30-Hour Construction", coversCredentials: ["osha30", "osha10"], city: "Pearland", zip: "77581",
@@ -249,6 +249,21 @@ export function seedData() {
     placements: index(placements),
     training_programs: index(training_programs),
     screenings: index(screenings),
+    employer_users: index([
+      { id: "eu1", employerId: "e1", email: "sam@example.com", name: "Sam Ruiz (demo hiring manager)", role: "hiring_manager", createdAt: ts(-20) },
+    ] satisfies EmployerUser[]),
+    providers: index([
+      { id: "pr1", name: "Ship Channel Safety Council (demo)", contactEmail: "classes@example.com", website: null, createdAt: ts(-40) },
+    ] satisfies Provider[]),
+    tasks: index([
+      { id: "tk1", ownerId: "tm2", title: "Call Example Industrial about turnaround headcount", dueOn: d(1), link: "/recruiter/jobs/j1", done: false, createdAt: ts(-1) },
+      { id: "tk2", ownerId: "tm2", title: "Ask Héctor to renew Basic Plus (Baytown class on Monday)", dueOn: d(2), link: "/recruiter/workers/w13", done: false, createdAt: ts(-1) },
+    ] satisfies Task[]),
+    audit_log: index([
+      { id: "a1", at: ts(-2), actorRole: "recruiter", actor: "maria@example.com", action: "screening.result", entityType: "screening", entityId: "s1", summary: "Drug screen recorded clear for Rosa Martínez (Scaffold builder)" },
+      { id: "a2", at: ts(-1), actorRole: "recruiter", actor: "maria@example.com", action: "screening.result", entityType: "screening", entityId: "s3", summary: "Drug screen flagged for review for Terrence Hall (Turnaround combo welder)" },
+    ] satisfies AuditEntry[]),
+    app_settings: {} as Record<string, AppSetting>,
     team_members: index([
       { id: "tm1", email: "owner@example.com", name: "Demo Admin", role: "admin", createdAt: ts(-90) },
       { id: "tm2", email: "maria@example.com", name: "María López (demo recruiter)", role: "recruiter", createdAt: ts(-60) },

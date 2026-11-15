@@ -3,12 +3,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { db, isDemo, newId, nowISO } from "@/lib/db";
-import { staffRoleFor } from "@/lib/team";
+import { employerFor, providerFor, staffRoleFor } from "@/lib/team";
 import { HOME, normalizeRole } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   if (isDemo()) return new NextResponse("Not found", { status: 404 });
-  const { accessToken, refreshToken } = (await req.json()) as { accessToken?: string; refreshToken?: string };
+  const { accessToken, refreshToken, intent } = (await req.json()) as { accessToken?: string; refreshToken?: string; intent?: "worker" | "employer" };
   if (!accessToken) return NextResponse.json({ error: "missing token" }, { status: 400 });
 
   const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
@@ -28,11 +28,26 @@ export async function POST(req: Request) {
   } else if (profile && (profile.role === "admin" || profile.role === "recruiter" || profile.role === "staff")) {
     return NextResponse.json({ error: "Your team access was removed. Ask an admin to add you again." }, { status: 403 });
   } else if (!profile) {
-    if (email) {
-      // Employers are created by an admin first (Admin → Employers); their contact email unlocks sign-in.
-      const employer = (await store.table("employers").list()).find((e) => e.email.toLowerCase() === email);
-      if (!employer) return NextResponse.json({ error: "No employer account for this email yet. Contact us to get set up." }, { status: 403 });
-      profile = { id: user.id, role: "employer", worker_id: null, employer_id: employer.id };
+    const asWorker = intent === "worker";
+    const emp = email && !asWorker ? await employerFor(email) : null;
+    const prov = email && !asWorker && !emp ? await providerFor(email) : null;
+    if (emp) {
+      // Company contact or an added hiring manager (Employer → Team).
+      profile = { id: user.id, role: "employer", worker_id: null, employer_id: emp.employerId };
+    } else if (prov) {
+      profile = { id: user.id, role: "provider", worker_id: null, employer_id: null, provider_id: prov.id };
+    } else if (email && asWorker) {
+      // Workers can sign in by email (no Twilio needed); they add a phone during signup.
+      const workers = store.table("workers");
+      let worker = (await workers.list()).find((w) => w.email?.toLowerCase() === email);
+      if (!worker) {
+        worker = { id: newId(), phone: `pending:${newId()}`, email, alerts: "email", name: "", lang: "en", zip: null, radiusMiles: 30, shifts: [], trade: null, yearsExperience: null, nccerLevel: 0,
+          skills: [], summary: "", consentSms: false, onboardingComplete: false, createdAt: nowISO() };
+        await workers.upsert(worker);
+      }
+      profile = { id: user.id, role: "worker", worker_id: worker.id, employer_id: null };
+    } else if (email) {
+      return NextResponse.json({ error: "No employer or training-provider account for this email yet. Workers: choose “I'm looking for work”. Companies: contact us to get set up." }, { status: 403 });
     } else if (user.phone) {
       const phone = user.phone.startsWith("+") ? user.phone : "+" + user.phone;
       const workers = store.table("workers");

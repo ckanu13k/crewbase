@@ -35,7 +35,7 @@ export interface GapWithPrograms {
 export function programsForGaps(gaps: Gap[], programs: TrainingProgram[], today: string, perGap = 3): GapWithPrograms[] {
   return trainableGaps(gaps).map((gap) => ({
     gap,
-    programs: sortPrograms(programs.filter((p) => programCovers(p, gap)), today).slice(0, perGap),
+    programs: sortPrograms(programs.filter((p) => p.status !== "pending" && programCovers(p, gap)), today).slice(0, perGap),
   }));
 }
 
@@ -152,7 +152,7 @@ export function rankTrainingNear(opts: {
 
 /** Programs whose requirement notes haven't been checked in this many days get flagged for staff. */
 export const REVIEW_EVERY_DAYS = 90;
-export function needsReview(p: TrainingProgram, today: string): boolean {
+export function needsReview(p: TrainingProgram, today: string, everyDays = REVIEW_EVERY_DAYS): boolean {
   if (!p.reviewedOn) return true;
-  return (Date.parse(today) - Date.parse(p.reviewedOn)) / 86_400_000 > REVIEW_EVERY_DAYS;
+  return (Date.parse(today) - Date.parse(p.reviewedOn)) / 86_400_000 > everyDays;
 }

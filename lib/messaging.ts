@@ -15,7 +15,9 @@ export const isFictionalNumber = (to: string) => /^\+1\d{3}55501\d{2}$/.test(to)
 export async function sendSms(to: string, body: string, channel: "sms" | "whatsapp" = "sms"): Promise<OutboxMessage> {
   const store = await db();
   const msg: OutboxMessage = { id: newId(), to, body, channel, status: "simulated", providerId: null, createdAt: nowISO() };
-  if (twilioConfigured() && !isFictionalNumber(to)) {
+  // Email-only workers have a placeholder until they add a phone; never try to text that.
+  if (!/^\+\d{8,15}$/.test(to)) msg.status = "failed";
+  else if (twilioConfigured() && !isFictionalNumber(to)) {
     try {
       const { default: twilio } = await import("twilio");
       const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);

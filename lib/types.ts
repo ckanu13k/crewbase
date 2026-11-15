@@ -16,6 +16,9 @@ export interface Worker {
   lat?: number | null; // from the device's location, if the worker shared it
   lng?: number | null;
   radiusMiles: number; // 0 = any distance
+  email?: string | null; // optional; lets a worker sign in and get alerts by email
+  alerts?: "sms" | "email" | "none";
+  lastSeenAt?: string | null;
   shifts: Shift[];
   trade: string | null; // TradeId
   yearsExperience: number | null;
@@ -45,6 +48,7 @@ export interface Credential {
 }
 
 export interface Employer {
+  recruiterId?: string | null; // team member who owns this account
   id: string;
   name: string;
   contactName: string;
@@ -146,6 +150,8 @@ export interface TrainingProgram {
   requirementNote?: string | null;
   /** Date staff last checked the requirements and dates against the provider and local employers. */
   reviewedOn?: string | null;
+  providerId?: string | null; // set when a training provider manages this listing
+  status?: "published" | "pending"; // provider-added listings wait for admin approval
 }
 
 export interface OnboardingSession {
@@ -163,7 +169,7 @@ export interface OutboxMessage {
   id: string;
   to: string;
   body: string;
-  channel: "sms" | "whatsapp";
+  channel: "sms" | "whatsapp" | "email";
   status: "sent" | "simulated" | "failed";
   providerId: string | null;
   createdAt: string;
@@ -215,5 +221,50 @@ export interface TeamMember {
   email: string;
   name: string;
   role: "admin" | "recruiter";
+  createdAt: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  at: string;
+  actorRole: string;
+  actor: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  summary: string;
+}
+
+export interface AppSetting {
+  id: string; // the setting key
+  value: unknown;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface Task {
+  id: string;
+  ownerId: string;
+  title: string;
+  dueOn: string | null;
+  link: string | null;
+  done: boolean;
+  createdAt: string;
+}
+
+export interface EmployerUser {
+  id: string;
+  employerId: string;
+  email: string;
+  name: string;
+  role: "owner" | "hiring_manager";
+  createdAt: string;
+}
+
+export interface Provider {
+  id: string;
+  name: string;
+  contactEmail: string;
+  website: string | null;
   createdAt: string;
 }

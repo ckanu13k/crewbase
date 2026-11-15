@@ -10,7 +10,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   const lang = await getLang();
   return (
     <Shell lang={lang} back="/login">
-      <LoginForm lang={lang} mode={sp.as === "employer" ? "email" : "phone"} supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!} anonKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!} />
+      <LoginForm lang={lang} mode={sp.as === "employer" || sp.as === "provider" ? "email" : sp.as === "worker-email" ? "workerEmail" : "phone"} supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!} anonKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!} />
     </Shell>
   );
 }

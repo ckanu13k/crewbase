@@ -27,6 +27,7 @@ export interface Inbound {
   text?: string;
   media?: { url?: string; bytes?: Uint8Array; contentType: string }[];
   knownPhone?: string | null; // signed-in phone (live web mode)
+  knownWorkerId?: string | null; // signed-in worker without a phone yet (email sign-in)
 }
 
 export interface EngineResult {
@@ -146,6 +147,7 @@ export async function handleInbound(deps: EngineDeps, inb: Inbound): Promise<Eng
   const isPhoneChannel = inb.channel !== "web";
   const phone = isPhoneChannel ? inb.address : inb.knownPhone ?? null;
 
+  if (!session.workerId && inb.knownWorkerId) session.workerId = inb.knownWorkerId;
   // A returning texter who already has a profile skips straight to the menu.
   if (!session.workerId && phone) {
     const existing = (await workers.list({ phone } as Partial<Worker>))[0];
@@ -252,7 +254,11 @@ export async function handleInbound(deps: EngineDeps, inb: Inbound): Promise<Eng
         break;
       }
       const existing = (await workers.list({ phone: p } as Partial<Worker>))[0];
-      worker = existing ?? (await ensureWorker(p));
+      if (worker && !existing) {
+        // Signed in by email: attach the phone to this account instead of creating another one.
+        worker = { ...worker, phone: p, consentSms: true };
+        await workers.upsert(worker);
+      } else worker = existing ?? (await ensureWorker(p));
       if (existing?.onboardingComplete) {
         go("done");
         say("done", { name: existing.name ? ", " + existing.name.split(" ")[0] : "", url: `${deps.appUrl}/me` });

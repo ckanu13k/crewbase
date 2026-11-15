@@ -14,7 +14,9 @@ export interface PlanCheck {
 /** Pairs below this score aren't proposed (e.g. a 10-year millwright as a shop helper). */
 export const DEFAULT_MIN_SCORE = 60;
 
-export async function buildPlan(minScore = DEFAULT_MIN_SCORE) {
+export async function buildPlan(minScoreIn?: number) {
+  const { getSettings } = await import("./settings");
+  const minScore = minScoreIn ?? (await getSettings()).optimizerMinScore ?? DEFAULT_MIN_SCORE;
   const store = await db();
   const today = todayISO();
   const [allWorkers, creds, allJobs, matches, placements, employers] = await Promise.all([

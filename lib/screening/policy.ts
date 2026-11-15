@@ -88,8 +88,8 @@ export function kindsToOrder(job: Job, screenings: Screening[], today: string): 
 }
 
 /** The final adverse-action notice may go out once the waiting period after the pre-adverse notice has passed. */
-export function canSendFinalNotice(s: Screening, today: string): boolean {
-  return s.status === "pre_adverse" && Boolean(s.preAdverseAt) && s.reportCopySent && businessDaysBetween(s.preAdverseAt!, today) >= ADVERSE_WAIT_BUSINESS_DAYS;
+export function canSendFinalNotice(s: Screening, today: string, waitDays = ADVERSE_WAIT_BUSINESS_DAYS): boolean {
+  return s.status === "pre_adverse" && Boolean(s.preAdverseAt) && s.reportCopySent && businessDaysBetween(s.preAdverseAt!, today) >= waitDays;
 }
 
 /** What employers see: outcome only. */

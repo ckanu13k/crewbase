@@ -31,6 +31,9 @@ function fakeStore(): Store {
       files[p] = b;
       return p;
     },
+    async removeFile(p: string) {
+      delete files[p];
+    },
     async readFile() {
       return null;
     },

@@ -10,8 +10,9 @@ const lit = (v: unknown): string => {
   if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'::jsonb`;
   return `'${String(v).replace(/'/g, "''")}'`;
 };
+const ORDER = ["team_members", "employers", "providers", "workers", "credentials", "jobs", "matches", "placements", "training_programs", "screenings", "employer_users", "tasks", "audit_log"] as const;
 const out: string[] = ["-- CrewPass demo data (all people and companies are fictional). Safe to re-run.", "begin;"];
-for (const t of ["employers", "workers", "credentials", "jobs", "matches", "placements", "training_programs", "screenings", "team_members"] as const) {
+for (const t of ORDER) {
   const rows = Object.values((s as any)[t]) as Record<string, unknown>[];
   for (const r of rows) {
     const keys = Object.keys(r).filter((k) => r[k] !== undefined);

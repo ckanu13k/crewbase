@@ -30,12 +30,14 @@ export async function POST(req: Request) {
     // Checkr returns "clear" or "consider" (or an assessment if adjudication rules are set up).
     const clear = obj.result === "clear" || obj.assessment === "eligible";
     const today = todayISO();
+    const { getSettings, screeningValidDays } = await import("@/lib/settings");
+    const days = screeningValidDays(kind, await getSettings()) || VALID_DAYS[kind];
     await store.table("screenings").upsert({
       ...s,
       status: clear ? "clear" : "needs_review",
       orderedAt: s.orderedAt ?? nowISO(),
       completedAt: nowISO(),
-      expiresOn: clear ? addDays(today, VALID_DAYS[kind]) : null,
+      expiresOn: clear ? addDays(today, days) : null,
       updatedAt: nowISO(),
     });
   }

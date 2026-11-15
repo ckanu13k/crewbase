@@ -18,7 +18,12 @@ export interface Session {
   role: Role;
   workerId: string | null;
   employerId: string | null;
+  providerId: string | null;
   userId: string | null;
+  /** Who this is, for the activity log: an email, a phone, or a demo label. */
+  actor: string;
+  /** team_members.id for admins/recruiters who have a row (owners in ADMIN_EMAILS may not). */
+  memberId: string | null;
 }
 
 export async function getLang(): Promise<Lang> {
@@ -31,7 +36,19 @@ export async function getSession(): Promise<Session | null> {
   if (isDemo()) {
     const role = normalizeRole(c.get("cp_role")?.value);
     if (!role) return null;
-    return { role, workerId: c.get("cp_worker")?.value ?? null, employerId: c.get("cp_employer")?.value ?? null, userId: null };
+    const memberId = isStaffRole(role) ? c.get("cp_member")?.value ?? (role === "admin" ? "tm1" : "tm2") : null;
+    let actor = `${role} (demo)`;
+    if (memberId) {
+      const { db } = await import("./db");
+      const m = await (await db()).table("team_members").get(memberId);
+      if (m) actor = m.email;
+    }
+    return {
+      role, memberId, actor, userId: null,
+      workerId: c.get("cp_worker")?.value ?? null,
+      employerId: c.get("cp_employer")?.value ?? null,
+      providerId: c.get("cp_provider")?.value ?? null,
+    };
   }
   const token = c.get("cp_token")?.value;
   if (!token) return null;
@@ -41,14 +58,26 @@ export async function getSession(): Promise<Session | null> {
   const { data: profile } = await admin.from("profiles").select("*").eq("id", user.user.id).maybeSingle();
   let role = normalizeRole(profile?.role);
   if (!profile || !role) return null;
-  // Staff access is re-checked on every request so removing someone from the team locks them out at once.
+  const email = user.user.email ?? null;
+  const team = await import("./team");
+  let memberId: string | null = null;
+  // Access is re-checked on every request, so removing someone (team, employer login, provider) locks them out at once.
   if (isStaffRole(role)) {
-    const { staffRoleFor } = await import("./team");
-    const current = await staffRoleFor(user.user.email);
+    const current = await team.staffRoleFor(email);
     if (!current) return null;
     role = current;
+    memberId = (await team.memberFor(email))?.id ?? null;
+  } else if (role === "employer") {
+    const e = await team.employerFor(email);
+    if (!e || e.employerId !== profile.employer_id) return null;
+  } else if (role === "provider") {
+    const p = await team.providerFor(email);
+    if (!p || p.id !== profile.provider_id) return null;
   }
-  return { role, workerId: profile.worker_id, employerId: profile.employer_id, userId: user.user.id };
+  return {
+    role, memberId, userId: user.user.id, actor: email ?? user.user.phone ?? user.user.id,
+    workerId: profile.worker_id, employerId: profile.employer_id, providerId: profile.provider_id ?? null,
+  };
 }
 
 /**

@@ -23,16 +23,22 @@ export const employerNav: Nav = [
   { href: "/employer", label: "Jobs", icon: "jobs" },
   { href: "/employer/jobs/new", label: "Post a job", icon: "post" },
   { href: "/employer/hires", label: "Hires & billing", icon: "placements" },
+  { href: "/employer/team", label: "Team", icon: "team" },
 ];
 /** Recruiter workspace. Admins see the same plus a link to their own workspace (added in Shell). */
 export const staffNav: Nav = [
   { href: "/recruiter", label: "Dashboard", icon: "dashboard" },
+  { href: "/recruiter/todo", label: "To-do", icon: "todo" },
   { href: "/recruiter/optimize", label: "Optimizer", icon: "optimize" },
   { href: "/recruiter/review", label: "Review", icon: "review" },
   { href: "/recruiter/screenings", label: "Screening", icon: "screening" },
   { href: "/recruiter/workers", label: "Workers", icon: "workers" },
   { href: "/recruiter/placements", label: "Placements", icon: "placements" },
-  { href: "/recruiter/outbox", label: "Texts", icon: "texts" },
+];
+/** Training providers: their own class listings. */
+export const providerNav: Nav = [
+  { href: "/provider", label: "My classes", icon: "classes" },
+  { href: "/training", label: "How workers see it", icon: "training" },
 ];
 /** Admin workspace: the business side. */
 export const adminNav: Nav = [
@@ -40,6 +46,7 @@ export const adminNav: Nav = [
   { href: "/admin/billing", label: "Billing", icon: "billing" },
   { href: "/admin/employers", label: "Employers", icon: "employers" },
   { href: "/admin/team", label: "Team", icon: "team" },
+  { href: "/admin/activity", label: "Activity", icon: "activity" },
   { href: "/admin/training", label: "Training", icon: "training" },
   { href: "/admin/settings", label: "Settings", icon: "settings" },
   { href: "/recruiter", label: "Recruiting", icon: "workers" },

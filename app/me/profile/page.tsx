@@ -3,12 +3,13 @@ import { db } from "@/lib/db";
 import { Shell, workerNav } from "@/components/Shell";
 import { TRADES, skillsForTrade } from "@/lib/taxonomy";
 import { shiftLabel } from "@/lib/training";
-import { updateProfile } from "@/app/actions";
+import { deleteMyAccount, updateProfile } from "@/app/actions";
 import { AREAS, zipToPoint } from "@/lib/geo";
 import { LocationBar } from "@/components/LocationBar";
 import { getUserLocation } from "@/lib/location";
 
-export default async function Profile() {
+export default async function Profile({ searchParams }: { searchParams: Promise<{ err?: string; del?: string }> }) {
+  const sp = await searchParams;
   const s = await requireWorker();
   const lang = await getLang();
   const es = lang === "es";
@@ -83,8 +84,41 @@ export default async function Profile() {
             <option value="es">Español</option>
           </select>
         </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label">{es ? "Correo (opcional)" : "Email (optional)"}</label>
+            <input name="email" type="email" defaultValue={w.email ?? ""} className="input" placeholder="you@email.com" />
+            {sp.err === "email" && <p className="mt-1 text-xs text-red-700">{es ? "Ese correo ya está en otra cuenta." : "That email is already on another account."}</p>}
+          </div>
+          <div>
+            <label className="label">{es ? "Alertas de trabajos nuevos" : "New job alerts"}</label>
+            <select name="alerts" defaultValue={w.alerts ?? "sms"} className="input" data-testid="alerts">
+              <option value="sms">{es ? "Por mensaje de texto" : "By text message"}</option>
+              <option value="email">{es ? "Por correo" : "By email"}</option>
+              <option value="none">{es ? "Sin alertas" : "No alerts"}</option>
+            </select>
+          </div>
+        </div>
         <button className="btn-primary w-full">{es ? "Guardar" : "Save"}</button>
       </form>
+
+      <section className="card mt-6 space-y-3" data-testid="my-data">
+        <h2 className="h2">{es ? "Tus datos" : "Your data"}</h2>
+        <p className="text-sm text-slate-600">{es ? "Descarga todo lo que tenemos sobre ti, o borra tu cuenta." : "Download everything we hold about you, or delete your account."}</p>
+        <a href="/api/me/export" className="btn-ghost btn-sm">{es ? "Descargar mis datos" : "Download my data"}</a>
+        <form action={deleteMyAccount} className="space-y-2 border-t border-slate-100 pt-3">
+          <p className="text-sm text-slate-600">
+            {es
+              ? "Borrar tu cuenta elimina tus tarjetas, fotos, mensajes y postulaciones. Si ya te contrataron por CrewPass, guardamos el registro de esa contratación sin tus datos personales. No se puede deshacer."
+              : "Deleting your account removes your cards, photos, messages and applications. If you were hired through CrewPass, we keep that hire's record without your personal details. This can't be undone."}
+          </p>
+          {sp.del === "confirm" && <p className="text-sm text-red-700">{es ? "Escribe DELETE para confirmar." : "Type DELETE to confirm."}</p>}
+          <div className="flex gap-2">
+            <input name="confirm" className="input" placeholder={es ? "Escribe DELETE" : "Type DELETE"} autoComplete="off" />
+            <button className="btn-ghost btn-sm text-red-700">{es ? "Borrar mi cuenta" : "Delete my account"}</button>
+          </div>
+        </form>
+      </section>
     </Shell>
   );
 }

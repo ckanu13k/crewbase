@@ -16,7 +16,7 @@ export function AuthCallback({ supabaseUrl, anonKey }: { supabaseUrl: string; an
       const res = await fetch("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken: session.access_token, refreshToken: session.refresh_token }),
+        body: JSON.stringify({ accessToken: session.access_token, refreshToken: session.refresh_token, intent: (() => { try { return localStorage.getItem("cp_intent") ?? undefined; } catch { return undefined; } })() }),
       });
       const body = await res.json();
       if (!res.ok) return setMsg(body.error ?? "Sign-in failed");
