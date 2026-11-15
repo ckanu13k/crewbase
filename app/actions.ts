@@ -144,6 +144,7 @@ export async function createJob(form: FormData) {
     payMin: Number(str(form, "payMin") || 0), payMax: Number(str(form, "payMax") || 0),
     shift: (str(form, "shift") || "day") as Shift, zip: str(form, "zip"), startDate: date(form, "startDate") ?? addDays(todayISO(), 14),
     headcount: Math.max(1, Number(str(form, "headcount") || 1)), placementFee: 0,
+    requiresBackground: str(form, "requiresBackground") === "on", requiresDrug: str(form, "requiresDrug") === "on",
     status: "open", description: str(form, "description"), createdAt: nowISO(),
   };
   job.placementFee = Number(str(form, "placementFee")) || defaultFee(job);
@@ -240,6 +241,10 @@ export async function markHired(form: FormData) {
   const job = await store.table("jobs").get(m.jobId);
   if (!job) return;
   const startDate = date(form, "startDate") ?? job.startDate;
+  // Required background check / drug screen must be clear for this employer before day one.
+  const { hireGate } = await import("@/lib/screening/policy");
+  const gate = hireGate(job, await store.table("screenings").list({ workerId: m.workerId } as never), todayISO());
+  if (!gate.ok) return;
   await store.table("matches").upsert({ ...m, stage: "hired", updatedAt: nowISO() });
   const p: Placement = {
     id: newId(), matchId: m.id, jobId: job.id, workerId: m.workerId, employerId: job.employerId, startDate,

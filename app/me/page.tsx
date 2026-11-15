@@ -12,6 +12,7 @@ import { gapText, shiftLabel } from "@/lib/training";
 import { LocationBar } from "@/components/LocationBar";
 import { AREAS } from "@/lib/geo";
 import { getUserLocation } from "@/lib/location";
+import { db } from "@/lib/db";
 
 export default async function WorkerHome() {
   const s = await requireWorker();
@@ -20,6 +21,7 @@ export default async function WorkerHome() {
   if (!worker || !worker.onboardingComplete) redirect("/onboard");
   const es = lang === "es";
   const loc = await getUserLocation(worker);
+  const toAuthorize = (await (await db()).table("screenings").list({ workerId: worker.id } as never)).filter((x) => x.status === "awaiting_consent").length;
 
   const alerts = creds.filter((c) => ["expired", "expiring"].includes(credentialStatus(c, today)));
   const unverified = creds.filter((c) => c.verification === "self").length;
@@ -62,6 +64,13 @@ export default async function WorkerHome() {
         </div>
       </section>
 
+      {toAuthorize > 0 && (
+        <Link href="/me/screening" className="mt-4 flex items-center gap-3 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark" data-testid="authorize-banner">
+          <ShieldAlert size={20} className="shrink-0" />
+          <span className="flex-1">{es ? "Un empleador quiere contratarte: autoriza la revisión de antecedentes / prueba de drogas." : "An employer wants to hire you: authorize the background check / drug screen."}</span>
+          <ChevronRight size={18} className="shrink-0 opacity-80" />
+        </Link>
+      )}
       {(alerts.length > 0 || unverified > 0) && (
         <div className="mt-4 space-y-2">
           {alerts.map((c) => {

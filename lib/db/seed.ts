@@ -2,7 +2,7 @@
 // Dates are relative to "today" so the demo always shows upcoming starts and expiring cards.
 
 import type {
-  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, TrainingProgram, Worker,
+  Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TrainingProgram, Worker,
 } from "../types";
 
 const DAY = 86_400_000;
@@ -139,12 +139,14 @@ export function seedData() {
   const jobs: Job[] = [
     J({ id: "j1", employerId: "e1", title: "Turnaround pipefitter", trade: "pipefitter", requiredCredentials: ["osha10", "twic", "basic_plus"], preferredCredentials: ["h2s"],
       requiredSkills: ["pipe_isometrics", "carbon_steel_pipe", "flange_boltup", "hydrotest"], minNccerLevel: 2, minYears: 4, payMin: 30, payMax: 36, shift: "turnaround",
-      zip: "77536", startDate: d(21), headcount: 4, placementFee: 4000, description: "Spring turnaround at a Deer Park unit. 6x12s. Per diem available." }),
+      zip: "77536", startDate: d(21), headcount: 4, placementFee: 4000, requiresBackground: true, requiresDrug: true,
+      description: "Spring turnaround at a Deer Park unit. 6x12s. Per diem available. Background check and drug screen before day one." }),
     J({ id: "j2", employerId: "e1", title: "Combo pipe welder (TIG/stick, 6G)", trade: "welder", requiredCredentials: ["osha10", "twic", "weld_test"], preferredCredentials: ["aws_welder"],
       requiredSkills: ["gtaw", "smaw", "pipe_6g", "weld_symbols"], minNccerLevel: 2, minYears: 5, payMin: 34, payMax: 40, shift: "night", zip: "77536", startDate: d(30),
-      headcount: 2, placementFee: 5000, description: "Carbon and chrome pipe. Must pass site weld test." }),
+      headcount: 2, placementFee: 5000, requiresDrug: true, description: "Carbon and chrome pipe. Must pass site weld test and a drug screen." }),
     J({ id: "j3", employerId: "e3", title: "Scaffold builder", trade: "scaffold", requiredCredentials: ["nccer_scaffold", "osha10", "basic_plus"], requiredSkills: ["frame_scaffold", "tube_clamp", "scaffold_tagging"],
-      minNccerLevel: 1, minYears: 2, payMin: 24, payMax: 28, zip: "77506", startDate: d(14), headcount: 6, placementFee: 3000, description: "Maintenance scaffolding, Pasadena plants." }),
+      minNccerLevel: 1, minYears: 2, payMin: 24, payMax: 28, zip: "77506", startDate: d(14), headcount: 6, placementFee: 3000, requiresDrug: true,
+      description: "Maintenance scaffolding, Pasadena plants. Drug screen before day one." }),
     J({ id: "j4", employerId: "e2", title: "Industrial electrician (journeyman)", trade: "electrician", requiredCredentials: ["tdlr_journeyman_electrician", "osha10"], preferredCredentials: ["twic"],
       requiredSkills: ["conduit_bending", "wire_pulling", "motor_controls", "electrical_troubleshooting"], minNccerLevel: 2, minYears: 4, payMin: 33, payMax: 38, zip: "77017",
       startDate: d(28), headcount: 1, placementFee: 5000, description: "New construction, chemical plant expansion." }),
@@ -158,7 +160,7 @@ export function seedData() {
       minNccerLevel: 1, minYears: 3, payMin: 26, payMax: 31, zip: "77449", startDate: d(17), headcount: 2, placementFee: 3500, description: "Spool fabrication from isos. No TWIC needed." }),
     J({ id: "j9", employerId: "e5", title: "Turnaround combo welder", trade: "welder", requiredCredentials: ["osha10", "twic", "basic_plus", "weld_test", "h2s"],
       requiredSkills: ["smaw", "gtaw", "pipe_6g"], minNccerLevel: 2, minYears: 4, payMin: 36, payMax: 42, shift: "turnaround", zip: "77640", startDate: d(24), headcount: 3,
-      placementFee: 5000, description: "Port Arthur refinery turnaround, 7x12s." }),
+      placementFee: 5000, requiresBackground: true, requiresDrug: true, description: "Port Arthur refinery turnaround, 7x12s. Background check and drug screen required." }),
     J({ id: "j10", employerId: "e6", title: "Industrial electrician", trade: "electrician", requiredCredentials: ["tdlr_journeyman_electrician", "osha10"],
       requiredSkills: ["conduit_bending", "wire_pulling", "motor_controls"], minNccerLevel: 2, minYears: 3, payMin: 32, payMax: 37, zip: "77301", startDate: d(21), headcount: 2,
       placementFee: 4500, description: "Conroe plant expansion." }),
@@ -171,6 +173,19 @@ export function seedData() {
     { id: "m1", jobId: "j3", workerId: "w3", stage: "interview", score: 88, notes: "Interview Tue 7am at the yard.", createdAt: ts(-3), updatedAt: ts(-1) },
     { id: "m2", jobId: "j2", workerId: "w2", stage: "shortlisted", score: 81, notes: "", createdAt: ts(-2), updatedAt: ts(-2) },
     { id: "m3", jobId: "j6", workerId: "w7", stage: "hired", score: 92, notes: "Started on time.", createdAt: ts(-45), updatedAt: ts(-36) },
+    { id: "m4", jobId: "j9", workerId: "w14", stage: "interview", score: 100, notes: "Employer wants him for the turnaround.", createdAt: ts(-6), updatedAt: ts(-4) },
+  ];
+
+  // Screenings: outcome and dates only (reports stay with the provider). Prices are estimates.
+  const S = (o: Partial<Screening> & Pick<Screening, "id" | "workerId" | "employerId" | "jobId" | "kind" | "status">): Screening => ({
+    matchId: null, provider: "manual", providerRef: null, consentUrl: null, consentAt: ts(-5), consentName: null, orderedAt: ts(-5),
+    completedAt: null, expiresOn: null, reviewedNote: null, preAdverseAt: null, reportCopySent: false, finalAdverseAt: null,
+    priceUsd: o.kind === "background" ? 65 : 75, invoiceId: null, createdAt: ts(-5), updatedAt: ts(-2), ...o,
+  });
+  const screenings: Screening[] = [
+    S({ id: "s1", workerId: "w3", employerId: "e3", jobId: "j3", matchId: "m1", kind: "drug", status: "clear", consentName: "Rosa Martínez", completedAt: ts(-2), expiresOn: d(28) }),
+    S({ id: "s2", workerId: "w14", employerId: "e5", jobId: "j9", matchId: "m4", kind: "background", status: "clear", consentName: "Terrence Hall", completedAt: ts(-2), expiresOn: d(363) }),
+    S({ id: "s3", workerId: "w14", employerId: "e5", jobId: "j9", matchId: "m4", kind: "drug", status: "needs_review", consentName: "Terrence Hall", completedAt: ts(-1) }),
   ];
 
   const placements: Placement[] = [
@@ -233,6 +248,7 @@ export function seedData() {
     matches: index(matches),
     placements: index(placements),
     training_programs: index(training_programs),
+    screenings: index(screenings),
     onboarding_sessions: {} as Record<string, OnboardingSession>,
     outbox: {} as Record<string, OutboxMessage>,
   };

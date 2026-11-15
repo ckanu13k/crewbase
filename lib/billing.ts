@@ -42,3 +42,33 @@ export async function createPlacementInvoice(p: Placement, employer: Employer, j
   await stripe.invoices.sendInvoice(finalized.id!);
   return { id: finalized.id!, url: finalized.hosted_invoice_url ?? null, simulated: false };
 }
+
+/** One invoice for an employer's screenings (background checks / drug screens), net 15. */
+export async function createScreeningInvoice(
+  employer: Employer,
+  lines: { id: string; description: string; amountUsd: number }[],
+): Promise<InvoiceResult> {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return { id: `demo_scr_${lines[0]?.id.slice(0, 8) ?? "x"}`, url: null, simulated: true };
+  }
+  const { default: Stripe } = await import("stripe");
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const existing = employer.email ? await stripe.customers.list({ email: employer.email, limit: 1 }) : null;
+  const customer =
+    existing?.data[0] ??
+    (await stripe.customers.create({ name: employer.name, email: employer.email || undefined, phone: employer.phone || undefined, metadata: { employerId: employer.id } }));
+  const invoice = await stripe.invoices.create({
+    customer: customer.id,
+    collection_method: "send_invoice",
+    days_until_due: 15,
+    auto_advance: false,
+    description: "Pre-employment screening",
+    metadata: { employerId: employer.id, screeningIds: lines.map((l) => l.id).join(",").slice(0, 490) },
+  });
+  for (const l of lines) {
+    await stripe.invoiceItems.create({ customer: customer.id, invoice: invoice.id, amount: Math.round(l.amountUsd * 100), currency: "usd", description: l.description });
+  }
+  const finalized = await stripe.invoices.finalizeInvoice(invoice.id!);
+  await stripe.invoices.sendInvoice(finalized.id!);
+  return { id: finalized.id!, url: finalized.hosted_invoice_url ?? null, simulated: false };
+}

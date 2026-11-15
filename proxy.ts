@@ -40,5 +40,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Pages and server actions; skip static files and the Twilio/cron webhooks.
-  matcher: ["/((?!_next/|icons/|api/twilio|api/cron|favicon.ico|icon.png|sw.js|manifest.webmanifest).*)"],
+  matcher: ["/((?!_next/|icons/|api/twilio|api/cron|api/screening|favicon.ico|icon.png|sw.js|manifest.webmanifest).*)"],
 };

@@ -31,16 +31,19 @@ export async function jobCandidates(jobId: string) {
   const today = todayISO();
   const job = await store.table("jobs").get(jobId);
   if (!job) return null;
-  const [workers, creds, matches, employer] = await Promise.all([
+  const [workers, creds, matches, employer, screenings] = await Promise.all([
     store.table("workers").list(),
     store.table("credentials").list(),
     store.table("matches").list({ jobId } as never),
     store.table("employers").get(job.employerId),
+    store.table("screenings").list({ employerId: job.employerId } as never),
   ]);
+  const screeningsByWorker: Record<string, typeof screenings> = {};
+  for (const x of screenings) (screeningsByWorker[x.workerId] ??= []).push(x);
   const credsByWorker: Record<string, Credential[]> = {};
   for (const c of creds) (credsByWorker[c.workerId] ??= []).push(c);
   const ranked = rankCandidates(workers.filter((w) => w.onboardingComplete), credsByWorker, job, today);
-  return { store, today, job, employer, ranked, matches, credsByWorker, workers };
+  return { store, today, job, employer, ranked, matches, credsByWorker, workers, screeningsByWorker };
 }
 
 export function gapPrograms(result: MatchResult, programs: Parameters<typeof programsForGaps>[1], today: string) {

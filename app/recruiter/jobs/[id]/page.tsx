@@ -7,6 +7,8 @@ import { ScorePill } from "@/components/Badges";
 import { credLabel, skillLabel, tradeLabel } from "@/lib/taxonomy";
 import { gapText, money } from "@/lib/training";
 import { markHired, setMatchStage, shortlist, textTopMatches, textWorkerAboutJob } from "@/app/actions";
+import { requestScreenings } from "@/app/screening-actions";
+import { DEFAULT_PRICE, KIND_LABEL, employerLabel, hireGate, kindsToOrder, requiredKinds } from "@/lib/screening/policy";
 import type { MatchStage, Worker } from "@/lib/types";
 import type { MatchResult } from "@/lib/matching";
 
@@ -18,7 +20,8 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
   const lang = await getLang();
   const data = await jobCandidates(id);
   if (!data) notFound();
-  const { job, employer, ranked, matches } = data;
+  const { job, employer, ranked, matches, screeningsByWorker, today } = data;
+  const kinds = requiredKinds(job);
   const matchByWorker = Object.fromEntries(matches.map((m) => [m.workerId, m]));
   const eligible = ranked.filter((r) => r.result.eligible);
   const close = ranked.filter((r) => !r.result.eligible && r.result.gaps.filter((g) => g.blocking).length <= 2).slice(0, 8);
@@ -30,6 +33,7 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
         <div>
           <h1 className="h1">{job.title}</h1>
           <p className="muted">{employer?.name} · {tradeLabel(job.trade, "en")} · ${job.payMin}–{job.payMax}/hr · {job.shift} · ZIP {job.zip} · starts {job.startDate} · {job.headcount} opening(s) · fee {money(job.placementFee)} · <b>{job.status}</b></p>
+          {kinds.length > 0 && <p className="mt-1 text-sm"><b>Before day one:</b> {kinds.map((k) => KIND_LABEL[k].en).join(" + ")} · <Link href="/recruiter/screenings" className="text-brand underline">Screenings →</Link></p>}
           <p className="mt-1 text-sm"><b>Required:</b> {job.requiredCredentials.map((c) => credLabel(c, "en")).join(", ")}{job.minNccerLevel ? ` · NCCER ${job.minNccerLevel}+` : ""}{job.minYears ? ` · ${job.minYears}+ yrs` : ""} · <b>Skills:</b> {job.requiredSkills.map((s) => skillLabel(s, "en")).join(", ")}</p>
         </div>
         <form action={textTopMatches} className="flex items-center gap-2">
@@ -42,11 +46,14 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
       <h2 className="h2 mb-2 mt-6">Pipeline</h2>
       <div className="card overflow-x-auto">
         <table className="data">
-          <thead><tr><th>Worker</th><th>Score</th><th>Stage</th><th>Notes</th><th>Hire</th></tr></thead>
+          <thead><tr><th>Worker</th><th>Score</th><th>Stage</th><th>Screening</th><th>Notes</th><th>Hire</th></tr></thead>
           <tbody>
-            {matches.length === 0 && <tr><td colSpan={5} className="muted">Nobody shortlisted yet.</td></tr>}
+            {matches.length === 0 && <tr><td colSpan={6} className="muted">Nobody shortlisted yet.</td></tr>}
             {matches.map((m) => {
               const w = data.workers.find((x) => x.id === m.workerId);
+              const mine = screeningsByWorker[m.workerId] ?? [];
+              const gate = hireGate(job, mine, today);
+              const toOrder = kindsToOrder(job, mine, today);
               return (
                 <tr key={m.id}>
                   <td><Link className="font-semibold text-brand hover:text-brand-dark" href={`/recruiter/workers/${m.workerId}`}>{w?.name}</Link><div className="muted">{w?.phone}</div></td>
@@ -64,9 +71,27 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
                       </form>
                     )}
                   </td>
+                  <td className="text-xs" data-testid="pipeline-screening">
+                    {kinds.length === 0 ? <span className="text-slate-400">Not required</span> : (
+                      <div className="space-y-1">
+                        {gate.items.map((it) => (
+                          <div key={it.kind}><b>{KIND_LABEL[it.kind].en}:</b> {it.screening ? employerLabel(it.screening) : "not started"}</div>
+                        ))}
+                        {toOrder.length > 0 && ["sent", "interview"].includes(m.stage) && (
+                          <form action={requestScreenings} className="flex flex-wrap items-center gap-1 pt-1">
+                            <input type="hidden" name="matchId" value={m.id} />
+                            {toOrder.map((k) => <input key={k} type="hidden" name={`price_${k}`} value={DEFAULT_PRICE[k]} />)}
+                            <button className="btn-soft btn-sm">Request {toOrder.map((k) => KIND_LABEL[k].en.toLowerCase()).join(" + ")}</button>
+                          </form>
+                        )}
+                        {gate.items.some((i) => i.state === "review") && <Link href="/recruiter/screenings" className="font-semibold text-amber-700 underline">Review needed →</Link>}
+                      </div>
+                    )}
+                  </td>
                   <td className="max-w-xs whitespace-pre-wrap text-xs text-slate-600">{m.notes}</td>
                   <td>
-                    {m.stage === "interview" && (
+                    {m.stage === "interview" && !gate.ok && <span className="text-xs text-slate-500">Hire unlocks when screening is clear</span>}
+                    {m.stage === "interview" && gate.ok && (
                       <form action={markHired} className="flex gap-1">
                         <input type="hidden" name="matchId" value={m.id} />
                         <input type="date" name="startDate" defaultValue={job.startDate} className="input min-h-9 py-1 text-sm" />

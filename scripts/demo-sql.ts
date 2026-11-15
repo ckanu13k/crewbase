@@ -11,7 +11,7 @@ const lit = (v: unknown): string => {
   return `'${String(v).replace(/'/g, "''")}'`;
 };
 const out: string[] = ["-- CrewPass demo data (all people and companies are fictional). Safe to re-run.", "begin;"];
-for (const t of ["employers", "workers", "credentials", "jobs", "matches", "placements", "training_programs"] as const) {
+for (const t of ["employers", "workers", "credentials", "jobs", "matches", "placements", "training_programs", "screenings"] as const) {
   const rows = Object.values((s as any)[t]) as Record<string, unknown>[];
   for (const r of rows) {
     const keys = Object.keys(r).filter((k) => r[k] !== undefined);

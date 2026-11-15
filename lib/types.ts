@@ -75,6 +75,9 @@ export interface Job {
   startDate: string; // YYYY-MM-DD
   headcount: number;
   placementFee: number; // $ per hire
+  /** Hiring steps the employer requires before day one. */
+  requiresBackground?: boolean;
+  requiresDrug?: boolean;
   status: JobStatus;
   description: string;
   createdAt: string;
@@ -164,4 +167,44 @@ export interface OutboxMessage {
   status: "sent" | "simulated" | "failed";
   providerId: string | null;
   createdAt: string;
+}
+
+// ---------------- Background checks and drug screens ----------------
+// Only the outcome and dates are stored here. The report itself stays with the screening provider.
+
+export type ScreeningKind = "background" | "drug";
+export type ScreeningProvider = "manual" | "checkr";
+export type ScreeningStatus =
+  | "awaiting_consent" // requested; the worker hasn't authorized it yet
+  | "in_progress" // authorized and ordered with the provider
+  | "clear" // no issues, or cleared after an individual review
+  | "needs_review" // provider flagged something; staff must review before any decision
+  | "pre_adverse" // pre-adverse action notice sent; waiting period running
+  | "not_cleared" // final adverse action notice sent
+  | "canceled";
+
+export interface Screening {
+  id: string;
+  workerId: string;
+  employerId: string;
+  jobId: string;
+  matchId: string | null;
+  kind: ScreeningKind;
+  provider: ScreeningProvider;
+  providerRef: string | null; // e.g. Checkr candidate id
+  consentUrl: string | null; // provider-hosted authorization page, if any
+  status: ScreeningStatus;
+  consentAt: string | null;
+  consentName: string | null; // typed signature
+  orderedAt: string | null;
+  completedAt: string | null; // date the result came back
+  expiresOn: string | null; // a clear result counts until this date
+  reviewedNote: string | null; // staff note on an individual review (no report details)
+  preAdverseAt: string | null;
+  reportCopySent: boolean;
+  finalAdverseAt: string | null;
+  priceUsd: number; // billed to the employer
+  invoiceId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -58,6 +58,14 @@ export function JobForm({ trades, credentials, skills, employers, defaultZip, de
           <label className="label">Openings</label>
           <input name="headcount" type="number" min={1} className="input" defaultValue={1} />
         </div>
+        <fieldset className="sm:col-span-2">
+          <legend className="label">Before day one</legend>
+          <div className="flex flex-wrap gap-2">
+            <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><input type="checkbox" name="requiresBackground" /> Background check</label>
+            <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><input type="checkbox" name="requiresDrug" /> Drug screen</label>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">We order these once you want to hire someone, with the worker's written authorization. You see only the outcome, billed at cost plus a handling fee.</p>
+        </fieldset>
         <div>
           <label className="label">Min. years / NCCER level</label>
           <div className="flex gap-2">

@@ -20,7 +20,7 @@ Demo mode uses fictional sample workers, employers, jobs and training programs (
 
 ## Go live (Vercel + Supabase)
 
-1. **Supabase**: create a project. In the SQL editor run `supabase/migrations/0001_init.sql`, `0002_rate_limits.sql`, then `0003_locations.sql` (or all at once: `supabase/setup.sql`). Optional demo board: run `supabase/demo-data.sql` (25 fictional workers, 6 employers, 11 jobs, 10 training programs; regenerate with `npm run demo:sql`). Demo phone numbers are in the reserved 555-01xx range and are never texted.
+1. **Supabase**: create a project. In the SQL editor run `supabase/migrations/0001_init.sql`, `0002_rate_limits.sql`, `0003_locations.sql`, then `0004_screenings.sql` (or all at once: `supabase/setup.sql`). Optional demo board: run `supabase/demo-data.sql` (25 fictional workers, 6 employers, 11 jobs, 10 training programs; regenerate with `npm run demo:sql`). Demo phone numbers are in the reserved 555-01xx range and are never texted.
    - Auth → Providers → **Email**: on. Auth → Email templates → **Magic link**: include `{{ .Token }}` so people get a 6-digit code (the sign-in screen asks for a code, not a link).
    - Auth → Providers → **Phone**: on, provider **Twilio Verify** (no A2P 10DLC needed for Verify codes).
    - Auth → URL configuration: set the Site URL to your Vercel URL.
@@ -41,6 +41,7 @@ Sign-in: workers use their phone (one-time code); employers and staff use email 
 | Taxonomy (trades, skills, cards, validity) | `lib/taxonomy.ts` |
 | Matching + gaps (pure, tested) | `lib/matching.ts`, `lib/training.ts`, `lib/matching.test.ts` |
 | Assignment optimizer (min-cost flow, tested vs brute force) | `lib/optimizer.ts`, `lib/optimizer.test.ts`, `lib/plan.ts`, `app/recruiter/optimize` |
+| Background checks / drug screens | `lib/screening/*`, `app/screening-actions.ts`, `app/recruiter/screenings`, `app/me/screening`, `app/api/screening/checkr` |
 | Location (ZIP centroids, device location, area picker) | `lib/geo.ts`, `lib/location.ts`, `app/api/location`, `components/LocationBar.tsx` |
 | Onboarding conversation (all channels) | `lib/onboarding/engine.ts`, `engine.test.ts` |
 | Claude calls (structured outputs, with fallbacks) | `lib/ai/*` |
@@ -58,6 +59,16 @@ Sign-in: workers use their phone (one-time code); employers and staff use email 
 - **Hard rules** (`evaluateMatch`): required cards valid on the start date, travel radius, shift, NCCER level, experience (more than a year short), and trade (cross-trade only with at least half the job's skills; anyone can be a helper). Everything else is scored 0–100.
 - **Optimizer** (Recruiter → Optimizer): all open jobs solved at once as a min-cost flow. It fills the most openings first, then maximizes total score; pairs under 60 aren't proposed. Every assignment is re-checked against the rules, and the page compares the result with job-by-job ranking. 2,000 workers × 200 jobs solves in well under a second.
 - **Training**: ranked for wherever the user is by how many open positions nearby ask for what the program gives (required or preferred cards, NCCER level, skills), so the list moves when employers change requirements. Staff keep each program's "What employers ask for now" note current in Recruiter → Training; saving marks it reviewed, and programs unreviewed for 90 days are flagged.
+
+## Background checks and drug screens
+
+- **Per job**: employers tick "Background check" / "Drug screen" when posting. The recruiter requests them from the job's pipeline once the employer wants to hire (sent or interview stage), and **Hired** stays locked until each is clear.
+- **Authorization**: the worker gets a text and signs a standalone disclosure + authorization at `/me/screening` (manual mode), or on Checkr's hosted page (Checkr mode).
+- **Providers**: manual by default (order in DISA/your lab's portal, record Clear or Flagged in **Recruiter → Screening**). Set `CHECKR_API_KEY`, `CHECKR_PACKAGE_BACKGROUND`, `CHECKR_PACKAGE_DRUG` and point a Checkr webhook at `/api/screening/checkr` to automate.
+- **Privacy**: only outcome and dates are stored; reports stay with the provider. Employers see Clear / In progress / Under review / Not cleared. A result is reused only for the same employer (background 12 months, drug 30 days — estimates in `lib/screening/policy.ts`).
+- **Flagged results**: clear after an individual review (note required), or send the pre-adverse notice (requires that a copy of the report and the FCRA Summary of Rights were sent), wait 5 business days, then the final notice.
+- **Billing**: each order carries a price (defaults $65 background / $75 drug, estimates). **Recruiter → Screening → Create invoice** bills an employer's ordered screenings in one Stripe invoice.
+- Have a lawyer review the disclosure wording and adverse-action process before ordering real checks.
 
 ## Pricing defaults
 
