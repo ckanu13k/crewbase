@@ -344,3 +344,7 @@ alter table tasks enable row level security;
 alter table employer_users enable row level security;
 alter table providers enable row level security;
 grant all on audit_log, app_settings, tasks, employer_users, providers to service_role;
+-- Admin is founder-only (ADMIN_EMAILS / STAFF_EMAILS). Team rows are recruiters.
+update team_members set role = 'recruiter' where role <> 'recruiter';
+alter table team_members drop constraint if exists team_members_role_check;
+alter table team_members add constraint team_members_role_check check (role = 'recruiter');

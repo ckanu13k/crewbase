@@ -1,7 +1,7 @@
 // Who can do what. One place, tested in permissions.test.ts.
 //
 // Personas
-//   admin     — runs the business: everything a recruiter can do, plus billing, team, employer
+//   admin     — the founder only (ADMIN_EMAILS). Runs the business: everything a recruiter can do, plus billing, team, employer
 //               accounts, training directory and settings.
 //   recruiter — day-to-day matching: pipeline, optimizer, card review, screenings, workers, texts,
 //               placements (day-30 check). Can post jobs on an employer's behalf. No billing.
@@ -44,7 +44,7 @@ export function normalizeRole(raw: string | null | undefined): Role | null {
   return null;
 }
 
-export const ROLE_LABEL: Record<Role, string> = { admin: "Admin", recruiter: "Recruiter", employer: "Employer", worker: "Worker", provider: "Training provider" };
+export const ROLE_LABEL: Record<Role, string> = { admin: "Founder", recruiter: "Recruiter", employer: "Employer", worker: "Worker", provider: "Training provider" };
 
 /** Where each persona lands after signing in. */
 export const HOME: Record<Role, string> = { admin: "/admin", recruiter: "/recruiter", employer: "/employer", worker: "/me", provider: "/provider" };

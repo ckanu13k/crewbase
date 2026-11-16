@@ -265,7 +265,6 @@ export function seedData() {
     ] satisfies AuditEntry[]),
     app_settings: {} as Record<string, AppSetting>,
     team_members: index([
-      { id: "tm1", email: "owner@example.com", name: "Demo Admin", role: "admin", createdAt: ts(-90) },
       { id: "tm2", email: "maria@example.com", name: "María López (demo recruiter)", role: "recruiter", createdAt: ts(-60) },
       { id: "tm3", email: "james@example.com", name: "James Carter (demo recruiter)", role: "recruiter", createdAt: ts(-30) },
     ] satisfies TeamMember[]),

@@ -14,8 +14,9 @@ export async function addTeamMember(form: FormData) {
   const s = await requireCap("manageTeam");
   const store = await db();
   const email = str(form, "email").toLowerCase();
-  const role = str(form, "role") === "admin" ? "admin" : "recruiter";
+  const role = "recruiter" as const; // admin is founder-only (ADMIN_EMAILS), never granted here
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) redirect("/admin/team?err=email");
+  if (envAdmins().includes(email)) redirect("/admin/team?err=founder");
   const existing = (await store.table("team_members").list()).find((m) => m.email.toLowerCase() === email);
   const row: TeamMember = existing
     ? { ...existing, role, name: str(form, "name") || existing.name }
@@ -26,29 +27,13 @@ export async function addTeamMember(form: FormData) {
   redirect("/admin/team?ok=1");
 }
 
-export async function setTeamRole(form: FormData) {
-  const s = await requireCap("manageTeam");
-  const store = await db();
-  const m = await store.table("team_members").get(str(form, "id"));
-  if (!m) return;
-  const role = str(form, "role") === "admin" ? "admin" : "recruiter";
-  const members = await store.table("team_members").list();
-  // Never demote the last admin (owners in ADMIN_EMAILS always count).
-  if (m.role === "admin" && role !== "admin" && envAdmins().length === 0 && members.filter((x) => x.role === "admin").length <= 1) redirect("/admin/team?err=last");
-  await store.table("team_members").upsert({ ...m, role });
-  await audit(s, "team.role", "team_member", m.id, `${m.email}: ${m.role} → ${role}`);
-  revalidatePath("/admin/team");
-}
-
 export async function removeTeamMember(form: FormData) {
   const s = await requireCap("manageTeam");
   const store = await db();
   const m = await store.table("team_members").get(str(form, "id"));
   if (!m) return;
-  const members = await store.table("team_members").list();
-  if (m.role === "admin" && envAdmins().length === 0 && members.filter((x) => x.role === "admin").length <= 1) redirect("/admin/team?err=last");
   await store.table("team_members").remove(m.id);
-  await audit(s, "team.removed", "team_member", m.id, `Removed ${m.email} (${m.role})`);
+  await audit(s, "team.removed", "team_member", m.id, `Removed recruiter ${m.email}`);
   revalidatePath("/admin/team");
 }
 

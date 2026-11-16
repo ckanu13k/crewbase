@@ -36,9 +36,9 @@ export async function getSession(): Promise<Session | null> {
   if (isDemo()) {
     const role = normalizeRole(c.get("cp_role")?.value);
     if (!role) return null;
-    const memberId = isStaffRole(role) ? c.get("cp_member")?.value ?? (role === "admin" ? "tm1" : "tm2") : null;
-    let actor = `${role} (demo)`;
-    if (memberId) {
+    const memberId = role === "admin" ? "founder" : role === "recruiter" ? c.get("cp_member")?.value ?? "tm2" : null;
+    let actor = role === "admin" ? "founder (demo)" : `${role} (demo)`;
+    if (memberId && role === "recruiter") {
       const { db } = await import("./db");
       const m = await (await db()).table("team_members").get(memberId);
       if (m) actor = m.email;
@@ -66,7 +66,7 @@ export async function getSession(): Promise<Session | null> {
     const current = await team.staffRoleFor(email);
     if (!current) return null;
     role = current;
-    memberId = (await team.memberFor(email))?.id ?? null;
+    memberId = role === "admin" ? `founder:${email}` : (await team.memberFor(email))?.id ?? null;
   } else if (role === "employer") {
     const e = await team.employerFor(email);
     if (!e || e.employerId !== profile.employer_id) return null;

@@ -49,7 +49,7 @@ export function LoginForm({ lang, mode: initial, supabaseUrl, anonKey }: { lang:
         {([
           ["phone", es ? "Trabajador · celular" : "Worker · phone"],
           ["workerEmail", es ? "Trabajador · correo" : "Worker · email"],
-          ["email", es ? "Empresa / equipo" : "Company / team"],
+          ["email", es ? "Empresa / personal" : "Company / staff"],
         ] as [Mode, string][]).map(([m, label]) => (
           <button key={m} className={`rounded-lg px-2 py-2 font-semibold transition ${mode === m ? "bg-white text-brand-dark shadow-card" : "text-slate-500 hover:text-ink"}`} onClick={() => { setMode(m); setSent(false); }}>{label}</button>
         ))}

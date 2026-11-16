@@ -34,6 +34,7 @@ export async function POST(req: Request) {
   }
   if (role === "employer") res.cookies.set("cp_employer", String(form.get("employerId") ?? "e1"), opts);
   if (role === "provider") res.cookies.set("cp_provider", String(form.get("providerId") ?? "pr1"), opts);
-  if (role === "admin" || role === "recruiter") res.cookies.set("cp_member", String(form.get("memberId") ?? (role === "admin" ? "tm1" : "tm2")), opts);
+  if (role === "recruiter") res.cookies.set("cp_member", String(form.get("memberId") ?? "tm2"), opts);
+  if (role !== "recruiter") res.cookies.delete("cp_member");
   return res;
 }

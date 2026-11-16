@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "./db";
 import type { Role } from "./permissions";
 
-/** Owner emails from the environment. STAFF_EMAILS is the older name; both mean admin. */
+/** Founder emails from the environment — the ONLY way to be an admin. STAFF_EMAILS is the older name. */
 export function envAdmins(): string[] {
   return [process.env.ADMIN_EMAILS, process.env.STAFF_EMAILS]
     .flatMap((v) => (v ?? "").split(","))
@@ -16,7 +16,8 @@ export async function staffRoleFor(email: string | null | undefined): Promise<Ex
   if (!e) return null;
   if (envAdmins().includes(e)) return "admin";
   const member = (await (await db()).table("team_members").list()).find((m) => m.email.trim().toLowerCase() === e);
-  return member?.role ?? null;
+  // Team members are recruiters, whatever an older row says. Admin is founder-only.
+  return member ? "recruiter" : null;
 }
 
 /** The team_members row for an email, if any (owners in ADMIN_EMAILS may not have one). */

@@ -218,7 +218,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
               </div>
               <div className="card bg-gradient-to-br from-brand-deep to-blue-700 text-white">
                 <div className="font-semibold">Our team</div>
-                <p className="mt-1 text-sm text-blue-100">Recruiters match and screen; admins also run billing, the team and settings.</p>
+                <p className="mt-1 text-sm text-blue-100">Recruiters match and screen. The founder's admin view adds billing, team and settings — nobody else sees it.</p>
                 <div className="mt-4 grid gap-2">
                   <form action="/api/demo" method="post">
                     <input type="hidden" name="role" value="recruiter" />
@@ -231,7 +231,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
                   </form>
                   <form action="/api/demo" method="post">
                     <input type="hidden" name="role" value="admin" />
-                    <button className="btn w-full bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20">Open admin <ArrowRight size={16} /></button>
+                    <button className="btn w-full bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20">Founder view (admin) <ArrowRight size={16} /></button>
                   </form>
                 </div>
               </div>

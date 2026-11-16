@@ -215,12 +215,12 @@ export interface Screening {
   updatedAt: string;
 }
 
-/** Admins and recruiters. Admins listed in ADMIN_EMAILS (or the older STAFF_EMAILS) always count as admin. */
+/** Recruiters. Admin is founder-only (ADMIN_EMAILS / STAFF_EMAILS), never a team row. */
 export interface TeamMember {
   id: string;
   email: string;
   name: string;
-  role: "admin" | "recruiter";
+  role: "recruiter";
   createdAt: string;
 }
 
