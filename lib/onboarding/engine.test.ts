@@ -64,6 +64,23 @@ describe("parseChoices", () => {
 });
 
 describe("SMS onboarding", () => {
+  it("asks for the kind of work first, then a short trade list for it", async () => {
+    const store = fakeStore();
+    const d = deps(store);
+    const send = (text: string) => handleInbound(d, { channel: "sms", address: "+17135550198", text });
+    await send("JOBS"); await send("1"); await send("yes");
+    const sector = (await send("Darnell Wright")).replies[0];
+    expect(sector).toContain("What kind of work");
+    expect(sector).toContain("3) Warehouse");
+    const trades = (await send("3")).replies[0];
+    expect(trades).toContain("Forklift operator");
+    expect(trades).not.toContain("Pipefitter");
+    expect(trades.length).toBeLessThan(320); // a couple of SMS segments, not ten
+    const n = trades.split("\n").find((l) => l.includes("Forklift operator"))!.split(")")[0];
+    expect((await send(n)).replies[0]).toContain("experience");
+    expect((await store.table("workers").list())[0].trade).toBe("forklift_operator");
+  });
+
   it("takes a Spanish speaker from first text to a complete profile", async () => {
     const store = fakeStore();
     const d = deps(store);
@@ -73,7 +90,8 @@ describe("SMS onboarding", () => {
     expect((await send("JOBS")).replies[0]).toContain("Reply 1 for English");
     expect((await send("2")).replies[0]).toContain("Responde SÍ");
     expect((await send("si")).replies[0]).toContain("¿Cómo te llamas?");
-    expect((await send("Juan Pérez")).replies[0]).toContain("oficio principal");
+    expect((await send("Juan Pérez")).replies[0]).toContain("tipo de trabajo");
+    expect((await send("1")).replies[0]).toContain("oficio principal");
     expect((await send("1")).replies[0]).toContain("experiencia");
 
     const confirm = await send("Tengo 7 años de tubero en refinerías, leo isométricos, hago prueba hidrostática. Tengo OSHA 10 y TWIC.");

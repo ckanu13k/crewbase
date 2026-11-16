@@ -4,7 +4,7 @@
 
 import type { Store } from "../db";
 import type { Channel, Credential, Lang, OnboardingSession, Shift, Worker } from "../types";
-import { CREDENTIAL_BY_ID, TRADES, credShort, skillLabel, tradeLabel } from "../taxonomy";
+import { CREDENTIAL_BY_ID, SECTORS, TRADES, credShort, skillLabel, tradeLabel } from "../taxonomy";
 import { credentialStatus, evaluateMatch } from "../matching";
 import { zipToPoint } from "../geo";
 import type { ProfileExtraction } from "../ai/rules";
@@ -37,7 +37,7 @@ export interface EngineResult {
   done: boolean;
 }
 
-type Step = "lang" | "consent" | "phone" | "name" | "trade" | "experience" | "confirm" | "fix" | "zip" | "radius" | "shifts" | "cards" | "done";
+type Step = "lang" | "consent" | "phone" | "name" | "sector" | "trade" | "experience" | "confirm" | "fix" | "zip" | "radius" | "shifts" | "cards" | "done";
 
 const STOP_WORDS = ["stop", "stopall", "unsubscribe", "cancel", "end", "quit", "alto", "parar"];
 const START_WORDS = ["start", "unstop", "yes start"];
@@ -74,7 +74,9 @@ function msg(lang: Lang, key: string, v: Record<string, string | number> = {}): 
     phone: { en: "What's your cell number? We'll text job matches there.", es: "¿Cuál es tu número de celular? Ahí te mandamos los trabajos." },
     phoneRetry: { en: "Please send a 10-digit US cell number, like 713 555 0100.", es: "Manda un número de 10 dígitos, por ejemplo 713 555 0100." },
     name: { en: "What's your name?", es: "¿Cómo te llamas?" },
-    trade: { en: "Thanks, {name}. What's your main trade? Reply with a number:\n{list}\nOr describe it in your own words.", es: "Gracias, {name}. ¿Cuál es tu oficio principal? Responde con un número:\n{list}\nO descríbelo con tus palabras." },
+    // Two short menus instead of one long one: a 23-line trade list is ~10 SMS segments in Spanish.
+    sector: { en: "Thanks, {name}. What kind of work? Reply with a number:\n{list}\nOr describe your trade in your own words.", es: "Gracias, {name}. ¿Qué tipo de trabajo? Responde con un número:\n{list}\nO describe tu oficio con tus palabras." },
+    trade: { en: "What's your main trade? Reply with a number:\n{list}\nOr describe it in your own words.", es: "¿Cuál es tu oficio principal? Responde con un número:\n{list}\nO descríbelo con tus palabras." },
     experience: {
       en: "Tell us about your experience in your own words: years in the trade, the work you've done (plants, construction sites, warehouses, homes), tools and equipment you use, and any cards (OSHA, NCCER, TWIC, forklift, CDL, licenses).",
       es: "Cuéntanos tu experiencia con tus palabras: años en el oficio, qué trabajos has hecho (plantas, obras, almacenes, casas), herramientas y equipo, y tus tarjetas (OSHA, NCCER, TWIC, montacargas, CDL, licencias).",
@@ -115,7 +117,10 @@ function msg(lang: Lang, key: string, v: Record<string, string | number> = {}): 
   return s;
 }
 
-const tradeList = (lang: Lang) => TRADES.map((t, i) => `${i + 1}) ${t.label[lang]}`).join("\n");
+const sectorList = (lang: Lang) => SECTORS.map((x, i) => `${i + 1}) ${x.label[lang]}`).join("\n");
+/** Trades offered after a sector is picked; all trades if none was. */
+const tradesIn = (sector: unknown) => (typeof sector === "string" ? TRADES.filter((t) => t.sectors.includes(sector as never)) : TRADES);
+const tradeList = (lang: Lang, sector: unknown) => tradesIn(sector).map((t, i) => `${i + 1}) ${t.label[lang]}`).join("\n");
 
 function summaryText(w: Worker, creds: string[], lang: Lang): string {
   const es = lang === "es";
@@ -274,14 +279,28 @@ export async function handleInbound(deps: EngineDeps, inb: Inbound): Promise<Eng
         break;
       }
       await saveWorker({ name: text.slice(0, 80) });
-      go("trade");
-      say("trade", { name: text.split(" ")[0], list: tradeList(lang()) });
+      go("sector");
+      say("sector", { name: text.split(" ")[0], list: sectorList(lang()) });
+      break;
+    }
+    case "sector": {
+      const c = parseChoices(text, SECTORS.length)[0];
+      if (c) {
+        session.answers.sector = SECTORS[c - 1].id;
+        go("trade");
+        say("trade", { list: tradeList(lang(), session.answers.sector) });
+      } else if (text.length > 2) {
+        await absorbExperience(text, null);
+      } else {
+        say("pickNumber");
+      }
       break;
     }
     case "trade": {
-      const c = parseChoices(text, TRADES.length)[0];
+      const options = tradesIn(session.answers.sector);
+      const c = parseChoices(text, options.length)[0];
       if (c) {
-        await saveWorker({ trade: TRADES[c - 1].id });
+        await saveWorker({ trade: options[c - 1].id });
         go("experience");
         say("experience");
       } else if (text.length > 2) {
@@ -470,6 +489,6 @@ export async function handleInbound(deps: EngineDeps, inb: Inbound): Promise<Eng
 }
 
 function promptKey(step: Step): string {
-  const map: Partial<Record<Step, string>> = { consent: "consent", phone: "phone", name: "name", trade: "pickNumber", experience: "experience", confirm: "fix", fix: "fix", zip: "zip", radius: "radius", shifts: "shifts" };
+  const map: Partial<Record<Step, string>> = { consent: "consent", phone: "phone", name: "name", sector: "pickNumber", trade: "pickNumber", experience: "experience", confirm: "fix", fix: "fix", zip: "zip", radius: "radius", shifts: "shifts" };
   return map[step] ?? "menu";
 }
