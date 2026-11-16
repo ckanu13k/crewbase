@@ -4,7 +4,7 @@ import { requireWorker, getLang } from "@/lib/session";
 import { db, todayISO } from "@/lib/db";
 import { PageHeader, Shell, workerNav } from "@/components/Shell";
 import { ReliabilityPill, payText } from "@/components/CrewBadges";
-import { clockIn, clockOut, saveMyTimesheet, setPayoutSpeed } from "@/app/crew-actions";
+import { callOff, clockIn, clockOut, saveMyTimesheet, setPayoutSpeed } from "@/app/crew-actions";
 import { addDaysISO, computeWeek, weekStart } from "@/lib/payroll";
 import { reliability } from "@/lib/reliability";
 import { money } from "@/lib/training";
@@ -92,9 +92,20 @@ export default async function MyWork() {
                   <input type="hidden" name="assignmentId" value={a.id} />
                   <button className="btn-primary" data-testid="clock-in"><LogIn size={16} /> {es ? "Marcar entrada" : "Clock in"}</button>
                 </form>
-              ) : (
+              ) : null}
+              {!open && a.startDate <= today && !timesheets.some((t) => t.assignmentId === a.id && t.date === today) ? (
+                <details data-testid="call-off">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-600">{es ? "No puedo ir hoy" : "I can't make it today"}</summary>
+                  <form action={callOff} className="mt-2 flex flex-wrap gap-2">
+                    <input type="hidden" name="assignmentId" value={a.id} />
+                    <input name="reason" maxLength={200} placeholder={es ? "Motivo (opcional)" : "Reason (optional)"} className="input min-h-10 flex-1 py-1 text-sm" />
+                    <button className="btn-ghost btn-sm">{es ? "Avisar a la empresa" : "Tell the employer"}</button>
+                  </form>
+                  <p className="mt-1 text-xs text-slate-500">{es ? "Avisar antes cuenta mejor en tu historial que no presentarte." : "Telling them ahead counts better on your record than not showing up."}</p>
+                </details>
+              ) : a.startDate > today ? (
                 <span className="muted">{es ? `Empieza el ${a.startDate}.` : `Starts ${a.startDate}.`}</span>
-              )}
+              ) : null}
             </div>
             <details className="mt-3">
               <summary className="cursor-pointer text-sm font-semibold text-brand">{es ? "Agregar o corregir un día" : "Add or fix a day"}</summary>

@@ -73,6 +73,28 @@ export async function clockIn(form: FormData) {
   refreshCrewPages();
 }
 
+/** "I can't make it today": recorded before the shift, it counts as a call-off (better for reliability than a no-show). */
+export async function callOff(form: FormData) {
+  const s = await requireWorker();
+  const store = await db();
+  const a = await myAssignment(s.workerId, str(form, "assignmentId"));
+  if (!a) return;
+  const today = todayISO();
+  const mine = await store.table("timesheets").list({ assignmentId: a.id } as Partial<Timesheet>);
+  if (mine.some((t) => t.date === today)) return; // already clocked in or logged today
+  const reason = str(form, "reason").slice(0, 200);
+  await store.table("timesheets").upsert({
+    id: newId(), assignmentId: a.id, workerId: a.workerId, employerId: a.employerId, jobId: a.jobId, date: today, clockIn: null, clockOut: null, breakMinutes: 0, hours: 0,
+    attendance: "called_off", perDiem: false, status: "submitted", note: reason ? `Called off: ${reason}` : "Called off before the shift.", approvedBy: null, approvedAt: null,
+    payRunId: null, payoutId: null, createdAt: nowISO(), updatedAt: nowISO(),
+  });
+  const [w, job] = await Promise.all([store.table("workers").get(a.workerId), store.table("jobs").get(a.jobId)]);
+  const who = w ? `${firstName(w.name)} ${w.name.split(" ")[1]?.[0] ?? ""}.` : "A crew member";
+  await emailEmployer(a.employerId, `${who} can't make it today`, `${who} called off today's shift on "${job?.title ?? "your job"}" (${today}).${reason ? ` Reason: ${reason}.` : ""}\n\nNeed a replacement? Reply to this email or call your recruiter.\n${appUrl()}/employer/timesheets`);
+  await audit(s, "timesheet.called_off", "timesheet", a.id, `Worker ${a.workerId} called off ${today}`);
+  refreshCrewPages(a.jobId);
+}
+
 export async function clockOut(form: FormData) {
   const s = await requireWorker();
   const store = await db();
