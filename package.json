@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "import:etpl": "node scripts/import-etpl.mjs",
     "import:zcta": "node scripts/import-zcta.mjs",
-    "demo:sql": "node --experimental-strip-types --no-warnings scripts/demo-sql.ts > supabase/demo-data.sql"
+    "demo:sql": "jiti scripts/demo-sql.ts > supabase/demo-data.sql"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

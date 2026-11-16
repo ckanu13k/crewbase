@@ -12,6 +12,11 @@ import { getSettings, screeningPrice } from "@/lib/settings";
 import { KIND_LABEL, employerLabel, hireGate, kindsToOrder, requiredKinds } from "@/lib/screening/policy";
 import type { MatchStage, Worker } from "@/lib/types";
 import type { MatchResult } from "@/lib/matching";
+import { HireTypeBadge, ReliabilityPill, payText } from "@/components/CrewBadges";
+import { crewSignals } from "@/lib/crewdata";
+import { slotLabel } from "@/lib/interviews";
+import { billRateFor } from "@/lib/payroll";
+import type { Reliability } from "@/lib/reliability";
 
 const STAGES: MatchStage[] = ["shortlisted", "sent", "interview", "hired", "rejected"];
 
@@ -26,6 +31,8 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
   const cfg = await getSettings();
   const matchByWorker = Object.fromEntries(matches.map((m) => [m.workerId, m]));
   const eligible = ranked.filter((r) => r.result.eligible);
+  const sig = await crewSignals(ranked.map((r) => r.worker.id));
+  const ivs = await data.store.table("interviews").list({ jobId: job.id } as never);
   const close = ranked.filter((r) => !r.result.eligible && r.result.gaps.filter((g) => g.blocking).length <= 2).slice(0, 8);
 
   return (
@@ -34,7 +41,8 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
       <div className="card mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="h1">{job.title}</h1>
-          <p className="muted">{employer?.name} · {tradeLabel(job.trade, "en")} · ${job.payMin}–{job.payMax}/hr · {job.shift} · ZIP {job.zip} · starts {job.startDate} · {job.headcount} opening(s) · fee {money(job.placementFee)} · <b>{job.status}</b></p>
+          <p className="muted">{employer?.name} · {tradeLabel(job.trade, "en")} · {payText(job)} · {job.shift} · ZIP {job.zip} · starts {job.startDate}{job.endDate ? ` → ${job.endDate}` : ""} · {job.headcount} opening(s) · {job.hireType === "temp" ? `temp, bill ~$${billRateFor(job.payMin, cfg.tempMarkupPct)}/hr${job.perDiem ? `, per diem $${job.perDiem}/day` : ""}` : `fee ${money(job.placementFee)}`} · <b>{job.status}</b></p>
+          <div className="mt-1"><HireTypeBadge job={job} /></div>
           {kinds.length > 0 && <p className="mt-1 text-sm"><b>Before day one:</b> {kinds.map((k) => KIND_LABEL[k].en).join(" + ")} · <Link href="/recruiter/screenings" className="text-brand underline">Screenings →</Link></p>}
           <p className="mt-1 text-sm"><b>Required:</b> {job.requiredCredentials.map((c) => credLabel(c, "en")).join(", ")}{job.minNccerLevel ? ` · NCCER ${job.minNccerLevel}+` : ""}{job.minYears ? ` · ${job.minYears}+ yrs` : ""} · <b>Skills:</b> {job.requiredSkills.map((s) => skillLabel(s, "en")).join(", ")}</p>
         </div>
@@ -61,7 +69,7 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
               const toOrder = kindsToOrder(job, mine, today);
               return (
                 <tr key={m.id}>
-                  <td><Link className="font-semibold text-brand hover:text-brand-dark" href={`/recruiter/workers/${m.workerId}`}>{w?.name}</Link><div className="muted">{w?.phone}</div></td>
+                  <td><Link className="font-semibold text-brand hover:text-brand-dark" href={`/recruiter/workers/${m.workerId}`}>{w?.name}</Link><div className="muted">{w?.phone}</div><div className="mt-1"><ReliabilityPill r={sig.rel(m.workerId)} /></div>{ivs.find((i) => i.matchId === m.id && i.status !== "canceled") && <div className="mt-1 text-xs text-emerald-700" data-testid="pipeline-interview">Interview: {(() => { const i = ivs.find((x) => x.matchId === m.id && x.status !== "canceled")!; return i.chosenSlot ? slotLabel(i.chosenSlot) : `offered ${i.slots.length} time(s)`; })()}</div>}</td>
                   <td>{m.score}</td>
                   <td>
                     {m.stage === "hired" ? (
@@ -97,13 +105,14 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
                   <td>
                     {m.stage === "interview" && !gate.ok && <span className="text-xs text-slate-500">Hire unlocks when screening is clear</span>}
                     {m.stage === "interview" && gate.ok && (
-                      <form action={markHired} className="flex gap-1">
+                      <form action={markHired} className="flex flex-wrap gap-1" data-testid="hire-form">
                         <input type="hidden" name="matchId" value={m.id} />
-                        <input type="date" name="startDate" defaultValue={job.startDate} className="input min-h-9 py-1 text-sm" />
-                        <button className="btn-primary btn-sm">Hired</button>
+                        <input type="date" name="startDate" defaultValue={job.startDate > today ? job.startDate : today} className="input min-h-9 py-1 text-sm" />
+                        {job.hireType === "temp" && <input type="number" name="payRate" step="0.25" min={job.payMin} max={Math.max(job.payMax, job.payMin)} defaultValue={job.payMin} className="input min-h-9 w-24 py-1 text-sm" aria-label="Pay rate" title="Pay rate ($/hr)" />}
+                        <button className="btn-primary btn-sm">{job.hireType === "temp" ? "Start assignment" : "Hired"}</button>
                       </form>
                     )}
-                    {m.stage === "hired" && <Link href="/recruiter/placements" className="text-sm font-semibold text-brand hover:text-brand-dark">Placement →</Link>}
+                    {m.stage === "hired" && <Link href={job.hireType === "temp" ? "/recruiter/crews" : "/recruiter/placements"} className="text-sm font-semibold text-brand hover:text-brand-dark">{job.hireType === "temp" ? "Crew →" : "Placement →"}</Link>}
                   </td>
                 </tr>
               );
@@ -114,16 +123,16 @@ export default async function RecruiterJob({ params }: { params: Promise<{ id: s
       <p className="muted mt-1">Setting a worker to <b>sent</b> shares them with the employer and texts the worker.</p>
 
       <h2 className="h2 mb-2 mt-6">Meets every requirement ({eligible.length})</h2>
-      <CandidateTable rows={eligible} jobId={job.id} matchByWorker={matchByWorker} />
+      <CandidateTable rows={eligible} jobId={job.id} matchByWorker={matchByWorker} rel={sig.rel} />
 
       <h2 className="h2 mb-2 mt-6">Close — 1–2 blocking gaps ({close.length})</h2>
       <p className="muted mb-2">Good candidates for employer-sponsored training or a quick card renewal.</p>
-      <CandidateTable rows={close} jobId={job.id} matchByWorker={matchByWorker} />
+      <CandidateTable rows={close} jobId={job.id} matchByWorker={matchByWorker} rel={sig.rel} />
     </Shell>
   );
 }
 
-function CandidateTable({ rows, jobId, matchByWorker }: { rows: { worker: Worker; result: MatchResult }[]; jobId: string; matchByWorker: Record<string, unknown> }) {
+function CandidateTable({ rows, jobId, matchByWorker, rel }: { rows: { worker: Worker; result: MatchResult }[]; jobId: string; matchByWorker: Record<string, unknown>; rel: (id: string) => Reliability }) {
   return (
     <div className="card overflow-x-auto">
       <table className="data">
@@ -135,6 +144,7 @@ function CandidateTable({ rows, jobId, matchByWorker }: { rows: { worker: Worker
               <td>
                 <Link className="font-semibold text-brand hover:text-brand-dark" href={`/recruiter/workers/${worker.id}`}>{worker.name}</Link>
                 <div className="muted">{tradeLabel(worker.trade, "en")} · {worker.yearsExperience ?? "?"} yrs · NCCER {worker.nccerLevel || "—"} · {result.distanceMiles !== null ? `${Math.round(result.distanceMiles)} mi` : "?"} · {worker.lang.toUpperCase()}</div>
+                <div className="mt-1"><ReliabilityPill r={rel(worker.id)} /></div>
               </td>
               <td><ScorePill score={result.score} eligible={result.eligible} /></td>
               <td className="text-xs text-slate-500">skills {result.breakdown.skills} · cards {result.breakdown.credentials} · pref {result.breakdown.preferred} · exp {result.breakdown.experience} · dist {result.breakdown.distance} · trade {result.breakdown.trade}</td>

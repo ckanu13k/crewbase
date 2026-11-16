@@ -3,6 +3,7 @@ import { isStaffRole } from "@/lib/permissions";
 import { db, todayISO } from "@/lib/db";
 import { Shell, employerNav, staffNav } from "@/components/Shell";
 import { JobForm } from "@/components/JobForm";
+import { getSettings } from "@/lib/settings";
 import { CREDENTIALS, SKILLS, TRADES } from "@/lib/taxonomy";
 
 export default async function NewJob() {
@@ -22,6 +23,8 @@ export default async function NewJob() {
         skills={SKILLS.map((x) => ({ id: x.id, label: x.label.en, trades: x.trades }))}
         employers={isStaffRole(s.role) ? employers.map((e) => ({ id: e.id, label: e.name })) : undefined}
         defaultZip={mine?.zip ?? ""}
+        markupPct={(await getSettings()).tempMarkupPct}
+        defaultSector={(await store.table("employers").get(s.employerId ?? ""))?.sector ?? undefined}
         defaultStart={start}
       />
     </Shell>

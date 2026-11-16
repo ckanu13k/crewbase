@@ -3,9 +3,10 @@ import { db, isDemo } from "@/lib/db";
 import { PageHeader, Shell, employerNav } from "@/components/Shell";
 import { employerFor } from "@/lib/team";
 import { addEmployerUser, removeEmployerUser } from "@/app/employer-actions";
+import { saveAtsWebhook, testAtsWebhook } from "@/app/hiring-actions";
 import type { EmployerUser } from "@/lib/types";
 
-export default async function EmployerTeam({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+export default async function EmployerTeam({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string; ats?: string }> }) {
   const s = await requireEmployer();
   const sp = await searchParams;
   const lang = await getLang();
@@ -43,6 +44,27 @@ export default async function EmployerTeam({ searchParams }: { searchParams: Pro
             <p className="text-xs text-slate-500">They can post and edit jobs and respond to shortlists. Only you can add or remove people.</p>
           </form>
         ) : <p className="card muted">Ask {employer?.email} to add or remove people.</p>}
+      </div>
+
+      <h2 className="h2 mb-2 mt-8">Connect your hiring software</h2>
+      <div className="card space-y-3" data-testid="ats-section">
+        <p className="text-sm text-slate-600">Send candidates, booked interviews and hires to your applicant-tracking system (ATS) automatically. We POST JSON to your URL and sign each request; your ATS or a tool like Zapier can read it. You can also download any job's candidates as a CSV from the job page.</p>
+        {sp.ats && <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold" data-testid="ats-msg">{sp.ats === "saved" ? "Saved." : sp.ats}</p>}
+        {!isOwner && <p className="text-sm text-slate-500">Only {employer?.email} can change this.</p>}
+        {isOwner && <form action={saveAtsWebhook} className="space-y-2">
+          <label className="label" htmlFor="ats-url">Webhook URL (https)</label>
+          <input id="ats-url" name="url" type="url" defaultValue={employer?.atsWebhookUrl ?? ""} placeholder="https://hooks.your-ats.com/crewpass" className="input" />
+          {employer?.atsWebhookUrl && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="rotate" /> Make a new signing secret</label>}
+          <button className="btn-soft btn-sm">Save</button>
+        </form>}
+        {isOwner && employer?.atsWebhookSecret && (
+          <div className="text-sm">
+            <div className="label">Signing secret</div>
+            <code className="block break-all rounded-lg bg-slate-100 px-3 py-2 text-xs" data-testid="ats-secret">{employer.atsWebhookSecret}</code>
+            <p className="mt-1 text-xs text-slate-500">Each request has headers <code>X-CrewPass-Timestamp</code> and <code>X-CrewPass-Signature</code> = hex HMAC-SHA256 of <code>timestamp.body</code> with this secret. Events: <code>candidate.sent</code>, <code>interview.booked</code>, <code>worker.hired</code>. Payloads hold first name + last initial, trade and verified cards only.</p>
+            <form action={testAtsWebhook} className="mt-2"><button className="btn-ghost btn-sm">Send a test event</button></form>
+          </div>
+        )}
       </div>
     </Shell>
   );

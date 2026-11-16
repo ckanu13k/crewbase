@@ -3,7 +3,10 @@
 
 import type {
   Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TeamMember, TrainingProgram, Worker, AuditEntry, AppSetting, Task, EmployerUser, Provider,
+  Assignment, Timesheet, PayRun, Payout, Rating, CrewMember, AssessmentAttempt, BenefitPlan, Interview, PayReport,
 } from "../types";
+import { computeWeek, earlyPayAmount, shiftHours, weekStart } from "../payroll";
+import { ASSESSMENT_BY_ID } from "../assessments";
 
 const DAY = 86_400_000;
 const today = () => new Date(new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }) + "T00:00:00Z");
@@ -50,17 +53,17 @@ export function seedData() {
     W({ id: "w13", name: "Héctor Salinas", lang: "es", trade: "pipefitter", zip: "77571", radiusMiles: 25, shifts: ["turnaround", "day"], yearsExperience: 6, nccerLevel: 2,
       skills: ["pipe_isometrics", "carbon_steel_pipe", "flange_boltup", "hydrotest"], summary: "Tubero de paros de planta en La Porte." }),
     W({ id: "w14", name: "Terrence Hall", trade: "welder", zip: "77640", radiusMiles: 30, shifts: ["night", "turnaround"], yearsExperience: 9, nccerLevel: 3,
-      skills: ["smaw", "gtaw", "pipe_6g", "weld_symbols", "stainless_pipe"], summary: "Combo pipe welder, Golden Triangle turnarounds." }),
+      skills: ["smaw", "gtaw", "pipe_6g", "weld_symbols", "stainless_pipe"], summary: "Combo pipe welder, Golden Triangle turnarounds.", payoutSpeed: "next_day", payrollStatus: "ready" }),
     W({ id: "w15", name: "Kendra Wallace", trade: "welder", zip: "77701", radiusMiles: 35, shifts: ["night", "turnaround"], yearsExperience: 7, nccerLevel: 2,
-      skills: ["smaw", "gtaw", "fcaw", "pipe_6g", "weld_symbols"], summary: "Pipe welder, Beaumont." }),
+      skills: ["smaw", "gtaw", "fcaw", "pipe_6g", "weld_symbols"], summary: "Pipe welder, Beaumont.", payoutSpeed: "next_day", payrollStatus: "ready" }),
     W({ id: "w16", name: "Jamal Price", trade: "welder", zip: "77530", radiusMiles: 30, shifts: ["night", "day"], yearsExperience: 5, nccerLevel: 2,
       skills: ["smaw", "gtaw", "fcaw", "pipe_6g", "weld_symbols"], summary: "6G TIG/stick, Channelview." }),
     W({ id: "w17", name: "Sofía Reyes", lang: "es", trade: "scaffold", zip: "77506", radiusMiles: 20, shifts: ["day"], yearsExperience: 3, nccerLevel: 1,
       skills: ["frame_scaffold", "tube_clamp", "system_scaffold", "scaffold_tagging"], summary: "Andamiera en Pasadena." }),
     W({ id: "w18", name: "Pedro Castillo", lang: "es", trade: "scaffold", zip: "77547", radiusMiles: 25, shifts: ["day", "turnaround"], yearsExperience: 2, nccerLevel: 1,
       skills: ["frame_scaffold", "tube_clamp", "scaffold_tagging"], summary: "Andamiero, Galena Park." }),
-    W({ id: "w19", name: "Andre Thomas", trade: "helper", zip: "77017", radiusMiles: 15, shifts: ["day"], yearsExperience: 2,
-      skills: ["material_handling", "power_tools", "forklift", "housekeeping"], summary: "Shop helper, forklift certified." }),
+    W({ id: "w19", name: "Andre Thomas", trade: "helper", zip: "77017", radiusMiles: 35, shifts: ["day", "night"], yearsExperience: 2,
+      skills: ["material_handling", "power_tools", "forklift", "housekeeping", "trailer_loading"], summary: "Shop helper, forklift certified.", payoutSpeed: "weekly", payrollStatus: "ready" }),
     W({ id: "w20", name: "María Delgado", lang: "es", trade: "helper", zip: "77084", radiusMiles: 15, shifts: ["day"], yearsExperience: 1,
       skills: ["material_handling", "power_tools", "housekeeping"], summary: "Ayudante en el oeste de Houston." }),
     W({ id: "w21", name: "Ryan Cooper", trade: "electrician", zip: "77301", radiusMiles: 30, shifts: ["day"], yearsExperience: 6, nccerLevel: 3,
@@ -71,6 +74,24 @@ export function seedData() {
       skills: ["material_handling", "housekeeping", "power_tools"], summary: "Nueva en la construcción; quiere trabajo en Katy." }),
     W({ id: "w25", name: "Marco Ruiz", lang: "es", trade: "electrician", zip: "77338", radiusMiles: 50, shifts: ["day"], yearsExperience: 8, nccerLevel: 3,
       skills: ["conduit_bending", "wire_pulling", "motor_controls", "electrical_troubleshooting", "cable_tray"], summary: "Electricista journeyman, Humble; viaja por toda el área." }),
+    // --- Construction, warehouse and residential ---
+    W({ id: "w26", name: "Darnell Wright", trade: "forklift_operator", zip: "77494", radiusMiles: 20, shifts: ["night", "day"], yearsExperience: 4,
+      skills: ["forklift", "reach_truck", "trailer_loading", "shipping_receiving", "order_picking", "pallet_jack"], summary: "Forklift and reach-truck operator, Katy distribution centers.",
+      payoutSpeed: "instant", payrollStatus: "ready" }),
+    W({ id: "w27", name: "Yesenia Flores", lang: "es", trade: "warehouse_associate", zip: "77449", radiusMiles: 15, shifts: ["day", "night"], yearsExperience: 2,
+      skills: ["order_picking", "packing", "pallet_jack", "material_handling", "shipping_receiving"], summary: "Almacenista, surtido con escáner y empaque." }),
+    W({ id: "w28", name: "Brian Kowalski", trade: "carpenter", zip: "77433", radiusMiles: 30, shifts: ["day"], yearsExperience: 6,
+      skills: ["framing", "layout", "formwork", "finish_carpentry", "power_tools", "fall_protection"], summary: "Framing carpenter, production homes in Cypress and Katy." }),
+    W({ id: "w29", name: "Guadalupe Sánchez", lang: "es", trade: "painter", zip: "77478", radiusMiles: 25, shifts: ["day"], yearsExperience: 5,
+      skills: ["surface_prep", "brush_roll", "spray_painting", "drywall_finishing", "make_ready", "customer_homes"], summary: "Pintora residencial y de apartamentos, 5 años." }),
+    W({ id: "w30", name: "Michael Okoye", trade: "maintenance_tech", zip: "77477", radiusMiles: 20, shifts: ["day"], yearsExperience: 4,
+      skills: ["make_ready", "appliance_repair", "minor_plumbing", "minor_electrical", "fixture_install", "customer_homes"], summary: "Apartment maintenance tech; make-readies, appliances, small HVAC." }),
+    W({ id: "w31", name: "Juan Morales", lang: "es", trade: "concrete", zip: "77095", radiusMiles: 30, shifts: ["day"], yearsExperience: 7,
+      skills: ["concrete_finishing", "rebar", "formwork", "layout"], summary: "Acabador de concreto, losas y banquetas." }),
+    W({ id: "w32", name: "Keisha Dunn", trade: "picker_packer", zip: "77494", radiusMiles: 15, shifts: ["day", "night"], yearsExperience: 1,
+      skills: ["order_picking", "packing", "pallet_jack"], summary: "Picker/packer, peak season at e-commerce warehouses." }),
+    W({ id: "w33", name: "Alicia Moore", trade: "driver", zip: "77064", radiusMiles: 40, shifts: ["day"], yearsExperience: 8,
+      skills: ["tractor_trailer", "pre_trip", "trailer_loading"], summary: "CDL-A driver, regional and local delivery." }),
     W({ id: "w24", name: "Chris Tran", trade: "hvac", zip: "77477", radiusMiles: 20, shifts: ["day"], yearsExperience: 4, nccerLevel: 2,
       skills: ["refrigerant_handling", "rooftop_units", "electrical_troubleshooting", "brazing"], summary: "Commercial HVAC tech, Stafford." }),
   ];
@@ -120,6 +141,14 @@ export function seedData() {
     C("w22", "tdlr_apprentice_electrician", { expiresOn: d(200) }), C("w22", "osha10"),
     C("w25", "tdlr_journeyman_electrician", { expiresOn: d(330) }), C("w25", "osha30"), C("w25", "twic", { expiresOn: d(900) }),
     C("w24", "epa608"), C("w24", "tdlr_acr", { expiresOn: d(250) }),
+    C("w26", "forklift_cert", { issuedOn: d(-400), expiresOn: d(695), verifiedMethod: "Called the employer that signed the evaluation" }), C("w26", "osha10_gi"),
+    C("w27", "osha10_gi", { verification: "document", verifiedBy: null }),
+    C("w28", "osha10"), C("w28", "cpr_first_aid", { expiresOn: d(300) }),
+    C("w29", "epa_rrp", { expiresOn: d(900), verifiedMethod: "Called the training provider" }), C("w29", "osha10", { verification: "self", verifiedBy: null }),
+    C("w30", "epa608"), C("w30", "osha10"),
+    C("w31", "osha10"),
+    C("w32", "forklift_cert", { expiresOn: d(20), verification: "document", verifiedBy: null }),
+    C("w33", "cdl_a", { expiresOn: d(1500), verifiedMethod: "License inspected" }), C("w33", "dot_medical", { expiresOn: d(200) }),
   ];
 
   const employers: Employer[] = [
@@ -128,8 +157,12 @@ export function seedData() {
     { id: "e3", recruiterId: "tm3", name: "Demo Scaffold & Access (demo)", contactName: "Ray Ortiz", email: "ray@example.com", phone: "+17135550153", zip: "77506", createdAt: ts(-45) },
     { id: "e4", recruiterId: "tm3", name: "Westside Fabrication (demo)", contactName: "Kim Alvarez", email: "kim@example.com", phone: "+17135550154", zip: "77449", createdAt: ts(-30) },
     { id: "e5", recruiterId: "tm2", name: "Golden Triangle Turnarounds (demo)", contactName: "Lee Broussard", email: "lee@example.com", phone: "+14095550155", zip: "77640", createdAt: ts(-25) },
-    { id: "e6", recruiterId: "tm3", name: "Northside Electrical (demo)", contactName: "Sam Patel", email: "sam@example.com", phone: "+19365550156", zip: "77301", createdAt: ts(-20) },
+    { id: "e6", recruiterId: "tm3", name: "Northside Electrical (demo)", contactName: "Sam Patel", email: "sam@example.com", phone: "+19365550156", zip: "77301", sector: "construction", createdAt: ts(-20) },
+    { id: "e7", recruiterId: "tm2", name: "Bayou Distribution Center (demo)", contactName: "Toni Greer", email: "toni@example.com", phone: "+12815550157", zip: "77494", sector: "warehouse", createdAt: ts(-30) },
+    { id: "e8", recruiterId: "tm3", name: "Cypress Creek Homebuilders (demo)", contactName: "Greg Holt", email: "greg@example.com", phone: "+12815550158", zip: "77433", sector: "construction", createdAt: ts(-18) },
+    { id: "e9", recruiterId: "tm3", name: "Fort Bend Home Services (demo)", contactName: "Nia Brooks", email: "nia@example.com", phone: "+12815550159", zip: "77478", sector: "residential", createdAt: ts(-12) },
   ];
+  for (const e of employers) e.sector ??= "industrial";
 
   const J = (o: Partial<Job> & Pick<Job, "id" | "employerId" | "title" | "trade">): Job => ({
     requiredCredentials: [], preferredCredentials: [], requiredSkills: [], minNccerLevel: 0, minYears: 0, payMin: 20, payMax: 25,
@@ -139,8 +172,9 @@ export function seedData() {
   const jobs: Job[] = [
     J({ id: "j1", employerId: "e1", title: "Turnaround pipefitter", trade: "pipefitter", requiredCredentials: ["osha10", "twic", "basic_plus"], preferredCredentials: ["h2s"],
       requiredSkills: ["pipe_isometrics", "carbon_steel_pipe", "flange_boltup", "hydrotest"], minNccerLevel: 2, minYears: 4, payMin: 30, payMax: 36, shift: "turnaround",
-      zip: "77536", startDate: d(21), headcount: 4, placementFee: 4000, requiresBackground: true, requiresDrug: true,
-      description: "Spring turnaround at a Deer Park unit. 6x12s. Per diem available. Background check and drug screen before day one." }),
+      zip: "77536", startDate: d(21), headcount: 4, placementFee: 0, requiresBackground: true, requiresDrug: true,
+      hireType: "temp", perDiem: 75, endDate: d(49), workOrder: "WO-DP-2026-118",
+      description: "Spring turnaround at a Deer Park unit. 6x12s, about four weeks. $75/day per diem. Background check and drug screen before day one." }),
     J({ id: "j2", employerId: "e1", title: "Combo pipe welder (TIG/stick, 6G)", trade: "welder", requiredCredentials: ["osha10", "twic", "weld_test"], preferredCredentials: ["aws_welder"],
       requiredSkills: ["gtaw", "smaw", "pipe_6g", "weld_symbols"], minNccerLevel: 2, minYears: 5, payMin: 34, payMax: 40, shift: "night", zip: "77536", startDate: d(30),
       headcount: 2, placementFee: 5000, requiresDrug: true, description: "Carbon and chrome pipe. Must pass site weld test and a drug screen." }),
@@ -159,21 +193,54 @@ export function seedData() {
     J({ id: "j8", employerId: "e4", title: "Shop pipefitter", trade: "pipefitter", requiredCredentials: ["osha10"], requiredSkills: ["pipe_isometrics", "carbon_steel_pipe"],
       minNccerLevel: 1, minYears: 3, payMin: 26, payMax: 31, zip: "77449", startDate: d(17), headcount: 2, placementFee: 3500, description: "Spool fabrication from isos. No TWIC needed." }),
     J({ id: "j9", employerId: "e5", title: "Turnaround combo welder", trade: "welder", requiredCredentials: ["osha10", "twic", "basic_plus", "weld_test", "h2s"],
-      requiredSkills: ["smaw", "gtaw", "pipe_6g"], minNccerLevel: 2, minYears: 4, payMin: 36, payMax: 42, shift: "turnaround", zip: "77640", startDate: d(24), headcount: 3,
-      placementFee: 5000, requiresBackground: true, requiresDrug: true, description: "Port Arthur refinery turnaround, 7x12s. Background check and drug screen required." }),
+      requiredSkills: ["smaw", "gtaw", "pipe_6g"], minNccerLevel: 2, minYears: 4, payMin: 38, payMax: 42, shift: "turnaround", zip: "77640", startDate: d(24), headcount: 3,
+      placementFee: 0, requiresBackground: true, requiresDrug: true, hireType: "temp", perDiem: 85, endDate: d(45), workOrder: "PA-TA-0412",
+      description: "Port Arthur refinery turnaround, 7x12s, three weeks. $85/day per diem. Background check and drug screen required." }),
     J({ id: "j10", employerId: "e6", title: "Industrial electrician", trade: "electrician", requiredCredentials: ["tdlr_journeyman_electrician", "osha10"],
       requiredSkills: ["conduit_bending", "wire_pulling", "motor_controls"], minNccerLevel: 2, minYears: 3, payMin: 32, payMax: 37, zip: "77301", startDate: d(21), headcount: 2,
       placementFee: 4500, description: "Conroe plant expansion." }),
     J({ id: "j11", employerId: "e2", title: "Commercial HVAC service tech", trade: "hvac", requiredCredentials: ["epa608", "tdlr_acr"],
       requiredSkills: ["refrigerant_handling", "rooftop_units", "electrical_troubleshooting"], minYears: 2, payMin: 27, payMax: 32, zip: "77036", startDate: d(14), headcount: 1,
       placementFee: 3500, description: "Rooftop units and service calls, southwest Houston." }),
+    // --- Warehouse, construction and residential ---
+    J({ id: "j12", employerId: "e7", sector: "warehouse", hireType: "temp", title: "Forklift operator — nights", trade: "forklift_operator", requiredCredentials: ["forklift_cert"],
+      requiredSkills: ["forklift", "trailer_loading"], payMin: 19, payMax: 19, shift: "night", zip: "77494", startDate: d(-14), endDate: d(60), headcount: 4, placementFee: 0,
+      workOrder: "BDC-PO-5531", description: "Unload and put away inbound trailers. 6pm–4:30am, Mon–Fri. Weekly pay or same-day pay.", createdAt: ts(-20) }),
+    J({ id: "j13", employerId: "e7", sector: "warehouse", hireType: "temp", title: "Picker / packer — peak season", trade: "picker_packer",
+      requiredSkills: ["order_picking", "packing"], payMin: 17, payMax: 17, shift: "day", zip: "77494", startDate: d(5), endDate: d(50), headcount: 10, placementFee: 0,
+      workOrder: "BDC-PO-5540", description: "RF-scanner picking and packing through the holidays. Steel-toe shoes required." }),
+    J({ id: "j14", employerId: "e8", sector: "construction", title: "Framing carpenter", trade: "carpenter", requiredCredentials: ["osha10"],
+      requiredSkills: ["framing", "layout"], preferredCredentials: ["cpr_first_aid"], minYears: 3, payMin: 25, payMax: 30, zip: "77433", startDate: d(14), headcount: 2, placementFee: 4000,
+      description: "Production homes in Bridgeland. Bring your own hand tools." }),
+    J({ id: "j15", employerId: "e8", sector: "construction", hireType: "temp", title: "Construction laborer", trade: "helper", requiredCredentials: ["osha10"],
+      requiredSkills: ["material_handling", "housekeeping"], payMin: 18, payMax: 18, zip: "77433", startDate: d(3), endDate: d(45), headcount: 4, placementFee: 0,
+      workOrder: "CCH-2211", description: "Site cleanup, material moves and helping framers. 7am–3:30pm." }),
+    J({ id: "j16", employerId: "e9", sector: "residential", title: "Apartment maintenance technician", trade: "maintenance_tech", preferredCredentials: ["epa608"],
+      requiredSkills: ["make_ready", "minor_plumbing", "minor_electrical", "appliance_repair"], minYears: 2, payMin: 21, payMax: 25, zip: "77478", startDate: d(10), headcount: 1,
+      placementFee: 3000, requiresBackground: true, description: "Sugar Land communities. On-call one weekend a month. Background check before day one (you'll be in residents' homes)." }),
+    J({ id: "j17", employerId: "e9", sector: "residential", hireType: "temp", title: "Residential painter", trade: "painter", preferredCredentials: ["epa_rrp"],
+      requiredSkills: ["surface_prep", "brush_roll"], minYears: 1, payMin: 20, payMax: 20, zip: "77478", startDate: d(7), endDate: d(35), headcount: 2, placementFee: 0,
+      requiresBackground: true, workOrder: "FBHS-118", description: "Interior repaints and make-readies. Lead-safe (RRP) card preferred for pre-1978 homes." }),
+    J({ id: "j18", employerId: "e5", sector: "industrial", hireType: "temp", title: "Fall turnaround welder", trade: "welder", requiredCredentials: ["osha10", "twic", "weld_test"],
+      requiredSkills: ["smaw", "gtaw"], minYears: 3, payMin: 38, payMax: 38, shift: "turnaround", zip: "77640", startDate: d(-60), endDate: d(-30), headcount: 2, placementFee: 0,
+      perDiem: 85, workOrder: "PA-TA-0388", status: "closed", description: "Completed turnaround.", createdAt: ts(-75) }),
   ];
+  for (const j of jobs) {
+    j.sector ??= j.employerId === "e6" ? "construction" : "industrial";
+    j.hireType ??= "direct";
+  }
 
   const matches: Match[] = [
     { id: "m1", jobId: "j3", workerId: "w3", stage: "interview", score: 88, notes: "Interview Tue 7am at the yard.", createdAt: ts(-3), updatedAt: ts(-1) },
     { id: "m2", jobId: "j2", workerId: "w2", stage: "shortlisted", score: 81, notes: "", createdAt: ts(-2), updatedAt: ts(-2) },
     { id: "m3", jobId: "j6", workerId: "w7", stage: "hired", score: 92, notes: "Started on time.", createdAt: ts(-45), updatedAt: ts(-36) },
     { id: "m4", jobId: "j9", workerId: "w14", stage: "interview", score: 100, notes: "Employer wants him for the turnaround.", createdAt: ts(-6), updatedAt: ts(-4) },
+    { id: "m5", jobId: "j12", workerId: "w26", stage: "hired", score: 96, notes: "", createdAt: ts(-18), updatedAt: ts(-15) },
+    { id: "m6", jobId: "j12", workerId: "w19", stage: "hired", score: 74, notes: "", createdAt: ts(-12), updatedAt: ts(-10) },
+    { id: "m7", jobId: "j14", workerId: "w28", stage: "sent", score: 95, notes: "", createdAt: ts(-2), updatedAt: ts(-1) },
+    { id: "m8", jobId: "j16", workerId: "w30", stage: "interview", score: 92, notes: "Employer offered interview times.", createdAt: ts(-3), updatedAt: ts(-1) },
+    { id: "m9", jobId: "j18", workerId: "w15", stage: "hired", score: 90, notes: "", createdAt: ts(-70), updatedAt: ts(-62) },
+    { id: "m10", jobId: "j18", workerId: "w14", stage: "hired", score: 94, notes: "", createdAt: ts(-70), updatedAt: ts(-62) },
   ];
 
   // Screenings: outcome and dates only (reports stay with the provider). Prices are estimates.
@@ -237,10 +304,131 @@ export function seedData() {
       coversCredentials: ["forklift_cert", "mewp_cert"], coversSkills: ["forklift", "aerial_lift"],
       nextStart: d(6), weeks: 0.2, clockHours: 8, costUsd: 175, funding: ["self", "employer"], languages: ["en", "es"],
       requirementNote: "OSHA requires an operator evaluation at least every 3 years; fab shops and warehouses ask for it up front." }),
+    // Construction, warehouse and residential
+    P({ id: "t11", provider: "West Houston Safety Training (demo)", name: "OSHA 10-Hour General Industry", coversCredentials: ["osha10_gi"], city: "Katy", zip: "77494",
+      nextStart: d(4), weeks: 0.4, clockHours: 10, costUsd: 85, funding: ["self", "employer"], languages: ["en", "es"],
+      requirementNote: "Warehouses and distribution centers along I-10 and the Grand Parkway ask for the general-industry card; construction sites want the construction card instead." }),
+    P({ id: "t12", provider: "Northwest Construction Academy (demo)", name: "Carpentry — NCCER Level 1 (framing)", trade: "carpenter", nccerLevel: 1, city: "Cypress", zip: "77433",
+      coversSkills: ["framing", "layout", "formwork", "fall_protection"], coversCredentials: ["nccer_core"],
+      nextStart: d(21), weeks: 8, clockHours: 160, costUsd: 1900, funding: ["wioa", "workforce_pell", "self"], languages: ["en", "es"],
+      requirementNote: "Homebuilders and framing subs hire helpers with Core and promote to carpenter after Level 1 or 2+ years." }),
+    P({ id: "t13", provider: "Fort Bend Renovation Training (demo)", name: "EPA Lead-Safe Renovator (RRP) initial", coversCredentials: ["epa_rrp"], city: "Sugar Land", zip: "77478",
+      nextStart: d(9), weeks: 0.2, clockHours: 8, costUsd: 250, funding: ["self", "employer"], languages: ["en", "es"],
+      requirementNote: "Required for paint, drywall or window work that disturbs paint in homes built before 1978." }),
+    P({ id: "t14", provider: "Gulf Coast Truck Driving School (demo)", name: "CDL Class A training", trade: "driver", coversCredentials: ["cdl_a"], coversSkills: ["pre_trip", "tractor_trailer"], city: "Houston", zip: "77064",
+      nextStart: d(14), weeks: 4, clockHours: 160, costUsd: 4800, funding: ["wioa", "self", "employer"], languages: ["en", "es"],
+      requirementNote: "FMCSA entry-level driver training from a registered provider is required before the CDL skills test; you also need a current DOT medical card." }),
+    P({ id: "t15", provider: "Ship Channel Safety Council (demo)", providerId: "pr1", name: "Flagger certification", coversCredentials: ["flagger"], coversSkills: ["flagging"], city: "Pasadena", zip: "77506",
+      nextStart: d(7), weeks: 0.1, clockHours: 4, costUsd: 65, funding: ["self", "employer"], languages: ["en", "es"],
+      requirementNote: "Road and site contractors need certified flaggers for lane closures; most cards are good for about 4 years." }),
   ];
 
+  // ---------------- Temp crews ----------------
+  const dow = (today().getUTCDay() + 6) % 7; // Monday = 0
+  const lastMon = -dow - 7;
+  const thisMon = -dow;
+  const A = (o: Partial<Assignment> & Pick<Assignment, "id" | "jobId" | "workerId" | "employerId" | "payRate" | "billRate">): Assignment => ({
+    matchId: null, startDate: d(-14), endDate: null, perDiem: 0, workOrder: null, status: "active", endedReason: null, createdAt: ts(-15), ...o,
+  });
+  const assignments: Assignment[] = [
+    A({ id: "as1", jobId: "j12", workerId: "w26", employerId: "e7", matchId: "m5", startDate: d(lastMon - 7), endDate: d(60), payRate: 19, billRate: 27.55, workOrder: "BDC-PO-5531" }),
+    A({ id: "as2", jobId: "j12", workerId: "w19", employerId: "e7", matchId: "m6", startDate: d(lastMon + 2), endDate: d(60), payRate: 19, billRate: 27.55, workOrder: "BDC-PO-5531" }),
+    A({ id: "as3", jobId: "j18", workerId: "w15", employerId: "e5", matchId: "m9", startDate: d(-60), endDate: d(-30), payRate: 38, billRate: 55.1, perDiem: 85, workOrder: "PA-TA-0388", status: "ended", endedReason: "Turnaround finished", createdAt: ts(-62) }),
+    A({ id: "as4", jobId: "j18", workerId: "w14", employerId: "e5", matchId: "m10", startDate: d(-60), endDate: d(-30), payRate: 38, billRate: 55.1, perDiem: 85, workOrder: "PA-TA-0388", status: "ended", endedReason: "Turnaround finished", createdAt: ts(-62) }),
+  ];
+  let tn = 0;
+  const TS = (a: Assignment, day: number, o: Partial<Timesheet> = {}): Timesheet => {
+    const clockIn = o.clockIn !== undefined ? o.clockIn : a.jobId === "j12" ? "18:00" : "06:00";
+    const clockOut = o.clockOut !== undefined ? o.clockOut : a.jobId === "j12" ? "04:30" : "18:30";
+    const attendance = o.attendance ?? "worked";
+    const hours = attendance === "no_show" || attendance === "called_off" ? 0 : shiftHours(clockIn, clockOut, 30);
+    return {
+      id: `ts${++tn}`, assignmentId: a.id, workerId: a.workerId, employerId: a.employerId, jobId: a.jobId, date: d(day), clockIn: attendance === "no_show" ? null : clockIn,
+      clockOut: attendance === "no_show" ? null : clockOut, breakMinutes: 30, attendance, perDiem: a.perDiem > 0 && hours > 0, status: "approved", note: "",
+      approvedBy: a.employerId === "e7" ? "toni@example.com" : "lee@example.com", approvedAt: ts(day + 1), payRunId: null, payoutId: null, createdAt: ts(day), updatedAt: ts(day + 1), ...o, hours: o.hours ?? hours,
+    };
+  };
+  const [as1, as2, as3, as4] = assignments;
+  const timesheets: Timesheet[] = [
+    ...[0, 1, 2, 3, 4].map((i) => TS(as1, lastMon + i)),
+    TS(as2, lastMon + 2), TS(as2, lastMon + 3, { attendance: "late", clockIn: "18:40", note: "Arrived 40 minutes late (traffic on I-10)." }), TS(as2, lastMon + 4, { attendance: "no_show", note: "No call, no show." }),
+    // The latest shifts are waiting for the employer to approve: this week so far, or the weekend just past on a Monday.
+    ...(dow >= 1
+      ? Array.from({ length: dow }, (_, i) => TS(as1, thisMon + i, { status: "submitted", approvedBy: null, approvedAt: null }))
+      : [5, 6].map((i) => TS(as1, lastMon + i, { status: "submitted", approvedBy: null, approvedAt: null }))),
+    TS(as2, dow >= 1 ? thisMon : lastMon + 5, { status: "submitted", approvedBy: null, approvedAt: null }),
+  ];
+  // The finished turnaround: one 6x12 week, already paid.
+  const taMon = Number(((Date.parse(weekStart(d(-50)) + "T00:00:00Z") - today().getTime()) / DAY).toFixed(0));
+  const taSheets = [as3, as4].flatMap((a) => [0, 1, 2, 3, 4, 5].map((i) => TS(a, taMon + i, { clockIn: "06:00", clockOut: "18:30", payRunId: "pr0" })));
+  timesheets.push(...taSheets);
+  const taWeek = computeWeek(taSheets, assignments);
+  const pay_runs: PayRun[] = [{
+    id: "pr0", periodStart: d(taMon), periodEnd: d(taMon + 6), status: "paid", lines: taWeek.lines,
+    invoices: taWeek.invoices.map((i) => ({ ...i, invoiceId: "demo_tmp_pr0" })), timesheetIds: taSheets.map((t) => t.id),
+    createdBy: "founder (demo)", createdAt: ts(taMon + 8), approvedAt: ts(taMon + 8), paidAt: ts(taMon + 10),
+  }];
+  // Darnell takes instant pay: each approved shift from last week was paid within minutes.
+  const payouts: Payout[] = timesheets.filter((t) => t.workerId === "w26" && t.status === "approved" && !t.payRunId).map((t, i) => ({
+    id: `po${i + 1}`, workerId: "w26", timesheetId: t.id, amount: earlyPayAmount(t, as1), speed: "instant", status: "sent", providerRef: `demo_pay_${i + 1}`, createdAt: t.approvedAt!, sentAt: t.approvedAt!,
+  }));
+  for (const p of payouts) timesheets.find((t) => t.id === p.timesheetId)!.payoutId = p.id;
+
+  const ratings: Rating[] = [
+    { id: "r1", workerId: "w15", employerId: "e5", jobId: "j18", assignmentId: "as3", placementId: null, quality: 5, safety: 5, rehire: true, comment: "Clean X-rays, first in the gate every day.", by: "lee@example.com", createdAt: ts(-29) },
+    { id: "r2", workerId: "w14", employerId: "e5", jobId: "j18", assignmentId: "as4", placementId: null, quality: 4, safety: 5, rehire: true, comment: "Solid. Want him back for spring.", by: "lee@example.com", createdAt: ts(-29) },
+    { id: "r3", workerId: "w7", employerId: "e1", jobId: "j6", assignmentId: null, placementId: "p1", quality: 5, safety: 5, rehire: true, comment: "", by: "pat@example.com", createdAt: ts(-6) },
+  ];
+  const CR = (id: string, employerId: string, workerId: string, note = ""): CrewMember => ({ id, employerId, workerId, note, addedBy: "demo", createdAt: ts(-20) });
+  const crew_roster = [CR("cr1", "e5", "w14", "Combo welder, 6G"), CR("cr2", "e5", "w15", "Pipe welder"), CR("cr3", "e1", "w7", "Rigger"), CR("cr4", "e7", "w26", "Night-shift lead")];
+
+  const firstIds = (id: string) => ASSESSMENT_BY_ID[id].questions.slice(0, 8).map((q) => q.id);
+  const AA = (o: Partial<AssessmentAttempt> & Pick<AssessmentAttempt, "id" | "workerId" | "assessmentId" | "kind" | "score">): AssessmentAttempt => ({
+    questionIds: o.kind === "knowledge" ? firstIds(o.assessmentId) : [], answers: null, startedAt: ts(-10), completedAt: ts(-10), passed: (o.score ?? 0) >= 70, proctored: o.kind === "hands_on",
+    assessor: null, note: null, ...o,
+  });
+  const assessment_attempts: AssessmentAttempt[] = [
+    AA({ id: "aa1", workerId: "w26", assessmentId: "forklift-warehouse", kind: "knowledge", score: 88 }),
+    AA({ id: "aa2", workerId: "w26", assessmentId: "forklift-warehouse", kind: "hands_on", score: 100, assessor: "maria@example.com", note: "Pre-shift check, stacked 3 high, reversed through the course cleanly." }),
+    AA({ id: "aa3", workerId: "w2", assessmentId: "jobsite-safety", kind: "knowledge", score: 75 }),
+    AA({ id: "aa4", workerId: "w28", assessmentId: "carpentry-fundamentals", kind: "knowledge", score: 88 }),
+  ];
+
+  const BP = (o: Partial<BenefitPlan> & Pick<BenefitPlan, "id" | "kind" | "name">): BenefitPlan => ({ carrier: "Sample carrier (demo)", status: "active", eligibility: "", workerCost: "$0", url: null, createdAt: ts(-60), ...o });
+  const benefit_plans: BenefitPlan[] = [
+    BP({ id: "bp1", kind: "workers_comp", name: "Workers' compensation", eligibility: "Every temp assignment, from your first hour. Report any injury the same day.", workerCost: "$0" }),
+    BP({ id: "bp2", kind: "health", name: "Health plan (minimum essential coverage)", eligibility: "Offered once you average 30+ hours a week (130 a month) on assignment.", workerCost: "About $25/week (demo figure)" }),
+    BP({ id: "bp3", kind: "paid_time_off", name: "Paid time off", eligibility: "1 hour earned for every 30 hours worked; usable after 90 days.", workerCost: "$0" }),
+    BP({ id: "bp4", kind: "dental_vision", name: "Dental and vision", status: "planned", eligibility: "Coming in 2027.", workerCost: "TBD" }),
+  ];
+
+  const IV = (o: Partial<Interview> & Pick<Interview, "id" | "matchId" | "jobId" | "workerId" | "employerId" | "slots">): Interview => ({
+    chosenSlot: null, mode: "in_person", location: "", status: "proposed", createdBy: "demo", createdAt: ts(-1), updatedAt: ts(-1), ...o,
+  });
+  const interviews: Interview[] = [
+    IV({ id: "i1", matchId: "m1", jobId: "j3", workerId: "w3", employerId: "e3", slots: [`${d(2)}T07:00`], chosenSlot: `${d(2)}T07:00`, status: "booked", location: "Demo Scaffold yard, Pasadena" }),
+    IV({ id: "i2", matchId: "m8", jobId: "j16", workerId: "w30", employerId: "e9", slots: [`${d(2)}T10:00`, `${d(3)}T14:00`], location: "Leasing office, Sugar Land" }),
+  ];
+
+  const PR = (id: string, trade: string, zip: string, hourly: number): PayReport => ({ id, workerId: null, trade, zip, hourly, createdAt: ts(-20) });
+  const pay_reports: PayReport[] = [
+    PR("pp1", "welder", "77530", 36), PR("pp2", "welder", "77640", 40), PR("pp3", "pipefitter", "77506", 33), PR("pp4", "pipefitter", "77571", 31),
+    PR("pp5", "forklift_operator", "77494", 18.5), PR("pp6", "forklift_operator", "77449", 19.5), PR("pp7", "forklift_operator", "77084", 18),
+    PR("pp8", "picker_packer", "77494", 16), PR("pp9", "picker_packer", "77449", 16.5), PR("pp10", "carpenter", "77433", 27), PR("pp11", "painter", "77478", 21),
+    PR("pp12", "helper", "77017", 18), PR("pp13", "helper", "77433", 17.5), PR("pp14", "electrician", "77301", 35),
+  ];
 
   return {
+    assignments: index(assignments),
+    timesheets: index(timesheets),
+    pay_runs: index(pay_runs),
+    payouts: index(payouts),
+    ratings: index(ratings),
+    crew_roster: index(crew_roster),
+    assessment_attempts: index(assessment_attempts),
+    benefit_plans: index(benefit_plans),
+    interviews: index(interviews),
+    pay_reports: index(pay_reports),
     workers: index(workers),
     credentials: index(credentials),
     employers: index(employers),

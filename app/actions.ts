@@ -16,7 +16,7 @@ import { runExpiryReminders } from "@/lib/reminders";
 import { allow } from "@/lib/ratelimit";
 import { evaluateMatch } from "@/lib/matching";
 import { appUrl } from "@/lib/onboarding/runtime";
-import { CREDENTIAL_BY_ID, TRADE_BY_ID, credLabel, defaultExpiry } from "@/lib/taxonomy";
+import { CREDENTIAL_BY_ID, TRADE_BY_ID, credLabel, defaultExpiry, defaultSector } from "@/lib/taxonomy";
 import type { Credential, Job, Match, MatchStage, Placement, Shift, TrainingProgram, Worker } from "@/lib/types";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -148,14 +148,29 @@ export async function createJob(form: FormData) {
     shift: (str(form, "shift") || "day") as Shift, zip: str(form, "zip"), startDate: date(form, "startDate") ?? addDays(todayISO(), 14),
     headcount: Math.max(1, Number(str(form, "headcount") || 1)), placementFee: 0,
     requiresBackground: str(form, "requiresBackground") === "on", requiresDrug: str(form, "requiresDrug") === "on",
+    ...jobKind(form, trade),
     status: "open", description: str(form, "description"), createdAt: nowISO(),
   };
-  job.placementFee = Number(str(form, "placementFee")) || feeFor(job, await getSettings());
+  if (job.payMax < job.payMin) job.payMax = job.payMin;
+  job.placementFee = job.hireType === "temp" ? 0 : Number(str(form, "placementFee")) || feeFor(job, await getSettings());
   await store.table("jobs").upsert(job);
   await audit(s, "job.created", "job", job.id, `Posted "${job.title}" (${job.headcount} opening(s), starts ${job.startDate})`);
   revalidatePath("/employer");
   revalidatePath("/recruiter");
   redirect(isStaffRole(s.role) ? `/recruiter/jobs/${job.id}` : `/employer/jobs/${job.id}?new=1`);
+}
+
+/** Sector, direct vs temp, and the temp-only fields. */
+function jobKind(form: FormData, trade: string): Pick<Job, "sector" | "hireType" | "perDiem" | "endDate" | "workOrder"> {
+  const sector = (["industrial", "construction", "warehouse", "residential"] as const).find((x) => x === str(form, "sector")) ?? defaultSector(trade);
+  const temp = str(form, "hireType") === "temp";
+  return {
+    sector,
+    hireType: temp ? "temp" : "direct",
+    perDiem: temp && Number(str(form, "perDiem")) > 0 ? Math.min(500, Number(str(form, "perDiem"))) : null,
+    endDate: temp ? date(form, "endDate") : null,
+    workOrder: str(form, "workOrder").slice(0, 60) || null,
+  };
 }
 
 /** Employer (own jobs) or staff: change a job. The placement fee stays as agreed. */
@@ -175,8 +190,13 @@ export async function updateJob(form: FormData) {
     shift: (str(form, "shift") || job.shift) as Shift, zip: /^\d{5}$/.test(str(form, "zip")) ? str(form, "zip") : job.zip,
     startDate: date(form, "startDate") ?? job.startDate, headcount: Math.max(1, Number(str(form, "headcount") || job.headcount)),
     requiresBackground: str(form, "requiresBackground") === "on", requiresDrug: str(form, "requiresDrug") === "on",
+    ...jobKind(form, trade),
     description: str(form, "description"),
   };
+  if (updated.payMax < updated.payMin) updated.payMax = updated.payMin;
+  // Switching to temp drops the placement fee; switching back to direct prices it again.
+  if (updated.hireType === "temp") updated.placementFee = 0;
+  else if (job.hireType === "temp") updated.placementFee = feeFor(updated, await getSettings());
   await store.table("jobs").upsert(updated);
   await audit(s, "job.updated", "job", job.id, `Edited "${updated.title}"`);
   revalidatePath(`/employer/jobs/${job.id}`);
@@ -247,6 +267,10 @@ export async function setMatchStage(form: FormData) {
   await audit(s, "match.stage", "match", m.id, `Moved to ${stage} (job ${m.jobId}, worker ${m.workerId})`);
   if (stage === "sent") {
     const [job, worker] = await Promise.all([store.table("jobs").get(m.jobId), store.table("workers").get(m.workerId)]);
+    if (job && worker) {
+      const { fireEmployerWebhook, candidatePayload } = await import("@/lib/ats");
+      void fireEmployerWebhook(job.employerId, "candidate.sent", candidatePayload(worker, await store.table("credentials").list({ workerId: worker.id } as Partial<Credential>), job));
+    }
     if (job) await emailEmployer(job.employerId, `New candidate for ${job.title}`, `A recruiter sent you a checked candidate for "${job.title}". Review them and request an interview: ${appUrl()}/employer/jobs/${job.id}`);
     if (job && worker?.consentSms) {
       const es = worker.lang === "es";
@@ -301,6 +325,19 @@ export async function markHired(form: FormData) {
   const gate = hireGate(job, await store.table("screenings").list({ workerId: m.workerId } as never), todayISO());
   if (!gate.ok) return;
   await store.table("matches").upsert({ ...m, stage: "hired", updatedAt: nowISO() });
+  const { fireEmployerWebhook, candidatePayload } = await import("@/lib/ats");
+  const hiredWorker = await store.table("workers").get(m.workerId);
+  if (hiredWorker) void fireEmployerWebhook(job.employerId, "worker.hired", { ...candidatePayload(hiredWorker, await store.table("credentials").list({ workerId: m.workerId } as Partial<Credential>), job), startDate });
+  if (job.hireType === "temp") {
+    // Temp: CrewPass employs the worker on an assignment and bills hourly. No placement fee.
+    const { createAssignmentFor } = await import("@/lib/crew");
+    await createAssignmentFor(s, m, Number(str(form, "payRate")) || null, startDate);
+    const active = (await store.table("assignments").list({ jobId: job.id } as never)).filter((a) => a.status === "active").length;
+    if (active >= job.headcount) await store.table("jobs").upsert({ ...job, status: "filled" });
+    revalidatePath(`/recruiter/jobs/${job.id}`);
+    revalidatePath("/recruiter/crews");
+    return;
+  }
   const cfg = await getSettings();
   const p: Placement = {
     id: newId(), matchId: m.id, jobId: job.id, workerId: m.workerId, employerId: job.employerId, startDate,
@@ -461,7 +498,13 @@ export async function deleteMyAccount(form: FormData) {
   }
   for (const x of (await store.table("onboarding_sessions").list()).filter((x) => x.workerId === w.id)) await store.table("onboarding_sessions").remove(x.id);
   for (const m of (await store.table("outbox").list()).filter((m) => m.to === w.phone || (w.email && m.to === w.email))) await store.table("outbox").remove(m.id);
-  const placed = (await store.table("placements").list({ workerId: w.id } as Partial<Placement>)).length > 0;
+  // Anyone who was placed or worked a temp assignment keeps payroll, billing and legal records (anonymized).
+  const placed = (await store.table("placements").list({ workerId: w.id } as Partial<Placement>)).length > 0 || (await store.table("assignments").list({ workerId: w.id } as never)).length > 0;
+  const by = { workerId: w.id } as never;
+  for (const x of await store.table("interviews").list(by)) await store.table("interviews").remove(x.id);
+  for (const x of await store.table("assessment_attempts").list(by)) await store.table("assessment_attempts").remove(x.id);
+  for (const x of await store.table("pay_reports").list(by)) await store.table("pay_reports").remove(x.id);
+  for (const x of (await store.table("crew_roster").list()).filter((c) => c.workerId === w.id)) await store.table("crew_roster").remove(x.id);
   for (const m of await store.table("matches").list({ workerId: w.id } as Partial<Match>)) if (!placed || m.stage !== "hired") await store.table("matches").remove(m.id);
   if (placed) {
     await store.table("workers").upsert({

@@ -3,6 +3,7 @@ import { requireEmployer, getLang } from "@/lib/session";
 import { db, todayISO } from "@/lib/db";
 import { Shell, employerNav } from "@/components/Shell";
 import { tradeLabel } from "@/lib/taxonomy";
+import { payText } from "@/components/CrewBadges";
 import { rankCandidates } from "@/lib/matching";
 import { getSettings } from "@/lib/settings";
 import type { Credential, Job, Match } from "@/lib/types";
@@ -29,7 +30,7 @@ export default async function EmployerHome() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="h1">{employer?.name}</h1>
-          <p className="muted">Flat fee per direct hire, due on the worker's day {cfg.feeDueDay}. Free replacement within {cfg.guaranteeDays} days.</p>
+          <p className="muted">Direct hire: flat fee due on the worker's day {cfg.feeDueDay}, free replacement within {cfg.guaranteeDays} days. Temp crews: hourly, one invoice a week.</p>
         </div>
         <Link href="/employer/jobs/new" className="btn-primary">Post a job</Link>
       </div>
@@ -42,7 +43,7 @@ export default async function EmployerHome() {
               const fit = rankCandidates(workers.filter((w) => w.onboardingComplete), byWorker, j, today).filter((r) => r.result.eligible).length;
               return (
                 <tr key={j.id}>
-                  <td><Link className="font-semibold text-brand hover:text-brand-dark" href={`/employer/jobs/${j.id}`}>{j.title}</Link><div className="muted">{tradeLabel(j.trade, "en")} · ${j.payMin}–{j.payMax}/hr · {j.headcount} opening(s)</div></td>
+                  <td><Link className="font-semibold text-brand hover:text-brand-dark" href={`/employer/jobs/${j.id}`}>{j.title}</Link><div className="muted">{tradeLabel(j.trade, "en")} · {payText(j)} · {j.headcount} opening(s) · {j.hireType === "temp" ? "temp crew" : "direct hire"}</div></td>
                   <td>{j.startDate}</td>
                   <td><span className={`pill ${j.status === "open" ? "bg-emerald-100 text-emerald-800" : "bg-slate-200"}`}>{j.status}</span></td>
                   <td>{fit}</td>

@@ -2,6 +2,7 @@ import "server-only";
 // Business defaults an admin can change in Admin → Settings. Stored in app_settings; anything not
 // saved falls back to the defaults here (which were estimates to start from).
 import { db, nowISO } from "./db";
+import { isEntryTrade } from "./taxonomy";
 
 export const SETTING_DEFS = {
   feeEntry: { label: "Placement fee — helper / entry", unit: "$", min: 0, max: 50000, def: 3000 },
@@ -15,6 +16,10 @@ export const SETTING_DEFS = {
   screeningValidDrug: { label: "Drug screen valid for", unit: "days", min: 1, max: 365, def: 30 },
   adverseWaitDays: { label: "Wait before final adverse notice", unit: "business days", min: 5, max: 30, def: 5 },
   optimizerMinScore: { label: "Optimizer minimum match score", unit: "/100", min: 0, max: 100, def: 60 },
+  tempMarkupPct: { label: "Temp markup on pay (covers payroll taxes, workers' comp and our fee)", unit: "%", min: 0, max: 200, def: 45 },
+  assessmentPassPct: { label: "Skills test passing score", unit: "%", min: 50, max: 100, def: 70 },
+  assessmentRetakeDays: { label: "Wait before retaking a skills test", unit: "days", min: 1, max: 365, def: 30 },
+  payCompareMinSamples: { label: "Pay comparison: minimum samples before showing a figure", unit: "samples", min: 3, max: 50, def: 3 },
   trainingReviewDays: { label: "Re-check training requirements every", unit: "days", min: 7, max: 365, def: 90 },
 } as const;
 
@@ -50,7 +55,7 @@ export async function saveSettings(input: Partial<Record<SettingKey, number>>, b
 
 /** Placement fee for a job from the current settings. */
 export function feeFor(j: { trade: string; minYears: number; minNccerLevel: number; requiredCredentials: string[] }, s: Settings): number {
-  if (j.trade === "helper" || j.minYears < 2) return s.feeEntry;
+  if (isEntryTrade(j.trade) || j.minYears < 2) return s.feeEntry;
   if (j.minNccerLevel >= 3 || j.minYears >= 5 || j.requiredCredentials.some((c) => c.includes("journeyman") || c.includes("master"))) return s.feeJourney;
   return s.feeMid;
 }

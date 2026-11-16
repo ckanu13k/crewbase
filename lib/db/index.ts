@@ -6,6 +6,7 @@
 import "server-only";
 import type {
   Credential, Employer, Job, Match, OnboardingSession, OutboxMessage, Placement, Screening, TeamMember, TrainingProgram, Worker, AuditEntry, AppSetting, Task, EmployerUser, Provider,
+  Assignment, Timesheet, PayRun, Payout, Rating, CrewMember, AssessmentAttempt, BenefitPlan, Interview, PayReport,
 } from "../types";
 
 export interface Rows {
@@ -25,6 +26,16 @@ export interface Rows {
   tasks: Task;
   employer_users: EmployerUser;
   providers: Provider;
+  assignments: Assignment;
+  timesheets: Timesheet;
+  pay_runs: PayRun;
+  payouts: Payout;
+  ratings: Rating;
+  crew_roster: CrewMember;
+  assessment_attempts: AssessmentAttempt;
+  benefit_plans: BenefitPlan;
+  interviews: Interview;
+  pay_reports: PayReport;
 }
 export type TableName = keyof Rows;
 

@@ -30,7 +30,8 @@ const SCHEMA = {
 };
 
 const SYSTEM = `You read photos of US construction and industrial safety cards, certifications and licenses
-(OSHA 10/30, NCCER, TWIC, TDLR licenses, AWS, safety council cards, CPR, forklift, etc.).
+(OSHA 10/30 construction and general industry, NCCER, TWIC, TDLR and TSBPE licenses, AWS, safety council cards,
+CPR, forklift, CDL, DOT medical cards, EPA 608 and RRP, flagger, etc.).
 Transcribe only what is printed. Never invent a number or a date. If a field isn't visible, return null.
 Dates must be YYYY-MM-DD. If the card type is not one of the allowed values, return null for type.`;
 

@@ -21,10 +21,11 @@ export type Capability =
   | "settings"
   | "viewAllCards" // see any worker's card photos
   | "viewAudit"
-  | "manageOwnListings"; // training providers
+  | "manageOwnListings" // training providers
+  | "payroll"; // run temp payroll, send early pay, manage benefit plans
 
 const CAPS: Record<Role, Capability[]> = {
-  admin: ["recruit", "postJobForAnyEmployer", "bill", "manageTeam", "manageEmployers", "manageTraining", "settings", "viewAllCards", "viewAudit"],
+  admin: ["recruit", "postJobForAnyEmployer", "bill", "manageTeam", "manageEmployers", "manageTraining", "settings", "viewAllCards", "viewAudit", "payroll"],
   recruiter: ["recruit", "postJobForAnyEmployer", "viewAllCards"],
   employer: [],
   worker: [],

@@ -8,6 +8,11 @@ import { credLabel, skillLabel, tradeLabel } from "@/lib/taxonomy";
 import { evaluateMatch } from "@/lib/matching";
 import { shiftLabel } from "@/lib/training";
 import type { Credential, Job, Match, OnboardingSession } from "@/lib/types";
+import { ReliabilityPill, TestBadges } from "@/components/CrewBadges";
+import { crewSignals } from "@/lib/crewdata";
+import { ASSESSMENTS, ASSESSMENT_BY_ID } from "@/lib/assessments";
+import { recordHandsOn } from "@/app/hiring-actions";
+import { setPayrollStatus } from "@/app/crew-actions";
 
 export default async function WorkerDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,6 +28,10 @@ export default async function WorkerDetail({ params }: { params: Promise<{ id: s
     store.table("matches").list({ workerId: id } as Partial<Match>),
     store.table("onboarding_sessions").list({ workerId: id } as Partial<OnboardingSession>),
   ]);
+  const sig = await crewSignals([id]);
+  const attempts = (await store.table("assessment_attempts").list({ workerId: id } as never)).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  const ratings = sig.ratings.filter((r) => r.workerId === id);
+  const employers = Object.fromEntries((await store.table("employers").list()).map((e) => [e.id, e.name]));
   const evals = jobs.map((j) => ({ j, r: evaluateMatch(w, creds, j, today) })).sort((a, b) => Number(b.r.eligible) - Number(a.r.eligible) || b.r.score - a.r.score);
 
   return (
@@ -55,6 +64,42 @@ export default async function WorkerDetail({ params }: { params: Promise<{ id: s
             {creds.length === 0 && <p className="muted">None.</p>}
           </div>
           <Link href="/recruiter/review" className="mt-3 inline-block text-sm underline">Review queue →</Link>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="card" data-testid="worker-track-record">
+          <h2 className="h2 mb-2">Track record</h2>
+          <ReliabilityPill r={sig.rel(id)} />
+          <ul className="mt-2 space-y-1 text-sm">
+            {ratings.map((r) => <li key={r.id}><b>{employers[r.employerId]}</b>: quality {r.quality}★, safety {r.safety}★, {r.rehire ? "would rehire" : "wouldn't rehire"}{r.comment ? ` — “${r.comment}”` : ""}</li>)}
+            {ratings.length === 0 && <li className="muted">No employer ratings yet.</li>}
+          </ul>
+          <form action={setPayrollStatus} className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <input type="hidden" name="workerId" value={id} />
+            <span className="font-semibold">Payroll paperwork</span>
+            <select name="status" defaultValue={w.payrollStatus ?? "not_started"} className="input min-h-9 w-auto py-1 text-sm">
+              <option value="not_started">Not started</option><option value="invited">Link sent</option><option value="ready">Done (W-4, I-9, deposit)</option>
+            </select>
+            <button className="btn-ghost btn-sm">Set</button>
+            <span className="text-xs text-slate-500">Pay speed: {w.payoutSpeed ?? "weekly"}</span>
+          </form>
+        </div>
+        <div className="card" data-testid="worker-tests">
+          <h2 className="h2 mb-2">Skills tests</h2>
+          <TestBadges best={sig.tests(id)} />
+          <ul className="mt-2 space-y-1 text-sm">
+            {attempts.filter((a) => a.completedAt).map((a) => <li key={a.id}>{ASSESSMENT_BY_ID[a.assessmentId]?.title.en}: {a.kind === "hands_on" ? `hands-on ${a.passed ? "pass" : "not yet"} by ${a.assessor}` : `${a.score}% in app${a.passed ? " (pass)" : ""}`} · {a.completedAt!.slice(0, 10)}{a.note ? ` — ${a.note}` : ""}</li>)}
+            {attempts.length === 0 && <li className="muted">None yet.</li>}
+          </ul>
+          <form action={recordHandsOn} className="mt-3 space-y-2" data-testid="hands-on-form">
+            <input type="hidden" name="workerId" value={id} />
+            <div className="flex flex-wrap gap-2">
+              <select name="assessmentId" className="input min-h-9 w-auto py-1 text-sm">{ASSESSMENTS.map((a) => <option key={a.id} value={a.id}>{a.title.en}</option>)}</select>
+              <select name="result" className="input min-h-9 w-auto py-1 text-sm"><option value="pass">Pass</option><option value="fail">Not yet</option></select>
+            </div>
+            <input name="note" placeholder="What you watched them do" className="input min-h-9 py-1 text-sm" />
+            <button className="btn-soft btn-sm">Record hands-on check</button>
+          </form>
         </div>
       </div>
       <h2 className="h2 mb-2 mt-6">Open jobs for this worker</h2>

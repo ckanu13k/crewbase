@@ -1,7 +1,7 @@
 // Offline, keyword-based extraction. Used when there's no API key, when the AI call fails, and as
 // a cross-check. Deliberately conservative: it only reports what it literally finds in the text.
 
-import { CREDENTIALS, SKILLS, TRADES } from "../taxonomy";
+import { CREDENTIALS, SKILLS, TRADES, isEntryTrade } from "../taxonomy";
 
 export interface ProfileExtraction {
   trade: string | null;
@@ -29,7 +29,8 @@ export function rulesExtract(raw: string, tradeHint: string | null = null): Prof
   const text = norm(raw);
 
   const tradeScores = TRADES.map((t) => ({ id: t.id, n: t.keywords.filter((k) => has(text, k)).length })).filter((x) => x.n > 0);
-  tradeScores.sort((a, b) => b.n - a.n);
+  // Most keyword hits wins; on a tie the specific trade beats an entry-level one ("forklift" + "warehouse" = forklift operator).
+  tradeScores.sort((a, b) => b.n - a.n || Number(isEntryTrade(a.id)) - Number(isEntryTrade(b.id)));
   const trade = tradeHint ?? tradeScores[0]?.id ?? null;
 
   let years: number | null = null;
@@ -42,7 +43,9 @@ export function rulesExtract(raw: string, tradeHint: string | null = null): Prof
 
   const skills = SKILLS.filter((s) => s.keywords.some((k) => has(text, k))).map((s) => s.id);
   // Prefer the more specific card: "OSHA 30" shouldn't also count as "OSHA 10".
-  const creds = CREDENTIALS.filter((c) => c.keywords.some((k) => has(text, k))).map((c) => ({ type: c.id, expiresOn: null }));
+  let creds = CREDENTIALS.filter((c) => c.keywords.some((k) => has(text, k))).map((c) => ({ type: c.id, expiresOn: null }));
+  // "OSHA 10 general industry" is the general-industry card only, unless they also mention construction.
+  if (creds.some((c) => c.type === "osha10_gi") && !/construction|construcci[oó]n/u.test(text)) creds = creds.filter((c) => c.type !== "osha10");
 
   const found = Number(trade !== null) + Number(years !== null) + Math.min(skills.length, 3) / 3 + Number(creds.length > 0);
   return {

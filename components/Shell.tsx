@@ -14,14 +14,17 @@ type Nav = NavItem[];
 export function workerNav(lang: Lang): Nav {
   return [
     { href: "/me", label: t(lang, "home"), icon: "home" },
+    { href: "/me/work", label: lang === "es" ? "Trabajo y pago" : "Work & pay", icon: "work" },
     { href: "/me/cards", label: t(lang, "wallet"), icon: "wallet" },
     { href: "/training", label: t(lang, "training"), icon: "training" },
-    { href: "/learn", label: t(lang, "practice"), icon: "practice" },
+    { href: "/learn", label: lang === "es" ? "Pruebas" : "Tests", icon: "practice" },
   ];
 }
 export const employerNav: Nav = [
   { href: "/employer", label: "Jobs", icon: "jobs" },
   { href: "/employer/jobs/new", label: "Post a job", icon: "post" },
+  { href: "/employer/timesheets", label: "Timesheets", icon: "timesheets" },
+  { href: "/employer/crew", label: "My crew", icon: "crew" },
   { href: "/employer/hires", label: "Hires & billing", icon: "placements" },
   { href: "/employer/team", label: "Team", icon: "team" },
 ];
@@ -34,6 +37,7 @@ export const staffNav: Nav = [
   { href: "/recruiter/screenings", label: "Screening", icon: "screening" },
   { href: "/recruiter/workers", label: "Workers", icon: "workers" },
   { href: "/recruiter/placements", label: "Placements", icon: "placements" },
+  { href: "/recruiter/crews", label: "Temp crews", icon: "timesheets" },
 ];
 /** Training providers: their own class listings. */
 export const providerNav: Nav = [
@@ -44,6 +48,8 @@ export const providerNav: Nav = [
 export const adminNav: Nav = [
   { href: "/admin", label: "Overview", icon: "dashboard" },
   { href: "/admin/billing", label: "Billing", icon: "billing" },
+  { href: "/admin/payroll", label: "Payroll", icon: "payroll" },
+  { href: "/admin/benefits", label: "Benefits", icon: "benefits" },
   { href: "/admin/employers", label: "Employers", icon: "employers" },
   { href: "/admin/team", label: "Team", icon: "team" },
   { href: "/admin/activity", label: "Activity", icon: "activity" },
@@ -80,7 +86,7 @@ export async function Shell({ lang, nav: navIn, back, wide, bare, children }: { 
             {demo && (
               <form action="/api/demo" method="post">
                 <input type="hidden" name="action" value="logout" />
-                <button className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-ink">{t(lang, "signOut")}</button>
+                <button className="whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-ink">{t(lang, "signOut")}</button>
               </form>
             )}
             {signedIn && (

@@ -35,10 +35,12 @@ function schedulePersist(data: Data) {
 }
 
 export async function createMemoryStore(): Promise<Store> {
-  const data = await load();
+  await load();
+  // Always read the live object: "Reset demo data" swaps it out, and the store itself may be cached.
+  const current = () => g.__crewpassData!;
 
   function table<N extends TableName>(name: N): Table<Rows[N]> {
-    const rows = () => (data[name] ??= {} as Data[N]) as Record<string, Rows[N]>;
+    const rows = () => (current()[name] ??= {} as Data[N]) as Record<string, Rows[N]>;
     return {
       async list(where) {
         const all = Object.values(rows());
@@ -52,12 +54,12 @@ export async function createMemoryStore(): Promise<Store> {
       },
       async upsert(row) {
         rows()[row.id] = structuredClone(row);
-        schedulePersist(data);
+        schedulePersist(current());
         return row;
       },
       async remove(id) {
         delete rows()[id];
-        schedulePersist(data);
+        schedulePersist(current());
       },
     };
   }
@@ -90,6 +92,7 @@ export async function createMemoryStore(): Promise<Store> {
 
 /** Wipe demo data back to the seed (used by the "Reset demo" button). */
 export async function resetMemoryStore() {
+  if (g.__crewpassSaveTimer) clearTimeout(g.__crewpassSaveTimer); // don't let a pending save write the old data back
   g.__crewpassData = seedData();
   await persist(g.__crewpassData);
   await fs.rm(UPLOADS, { recursive: true, force: true });

@@ -7,7 +7,16 @@ import {
 import { db, isDemo } from "@/lib/db";
 import { HOME } from "@/lib/permissions";
 import { getLang, getSession } from "@/lib/session";
-import { tradeLabel } from "@/lib/taxonomy";
+import { sectorLabel, tradeLabel, tradeSectors } from "@/lib/taxonomy";
+import type { Worker } from "@/lib/types";
+
+/** A few demo workers from each sector, temp-crew workers first. */
+function demoWorkers(all: Worker[]) {
+  const pick = ["w26", "w1", "w2", "w3", "w27", "w28", "w29", "w30", "w31", "w33", "w5", "w14"];
+  const done = all.filter((w) => w.onboardingComplete);
+  const chosen = pick.map((id) => done.find((w) => w.id === id)).filter((w): w is Worker => Boolean(w));
+  return chosen.length >= 6 ? chosen : done.slice(0, 12);
+}
 import { Shell } from "@/components/Shell";
 import { Logo } from "@/components/Logo";
 
@@ -26,14 +35,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
 
   const steps = [
     { icon: MessageSquareText, title: es ? "Regístrate en 5 minutos" : "Sign up in 5 minutes", body: es ? "Por texto, llamada o aquí. Cuéntanos tu experiencia con tus palabras." : "By text, phone call or right here. Tell us your experience in your own words." },
-    { icon: Camera, title: es ? "Sube tus tarjetas" : "Add your cards", body: es ? "Toma foto de tu OSHA, NCCER o TWIC. Leemos las fechas y te avisamos antes de que venzan." : "Snap your OSHA, NCCER or TWIC. We read the dates and remind you before they expire." },
-    { icon: Briefcase, title: es ? "Recibe trabajos que te quedan" : "Get jobs that fit", body: es ? "Te mostramos qué te falta para cada trabajo y dónde conseguirlo." : "See exactly what you're missing for each job, and where to get it." },
+    { icon: Camera, title: es ? "Sube tus tarjetas" : "Add your cards", body: es ? "Toma foto de tu OSHA, montacargas, CDL o TWIC. Leemos las fechas y te avisamos antes de que venzan." : "Snap your OSHA, forklift, CDL or TWIC card. We read the dates and remind you before they expire." },
+    { icon: Briefcase, title: es ? "Recibe trabajos que te quedan" : "Get jobs that fit", body: es ? "Te mostramos qué te falta para cada trabajo y dónde conseguirlo. En trabajos temporales registras tus horas aquí y cobras al día siguiente, sin costo." : "See exactly what you're missing for each job, and where to get it. On temp jobs you log hours here and can get paid the next day, free." },
   ];
 
   const employerPoints = [
     { icon: Clock, title: es ? "Lista en 48 horas" : "Shortlist in 48 hours", body: es ? "Candidatos revisados por un reclutador, no un montón de currículums." : "Recruiter-checked candidates, not a pile of resumes." },
     { icon: BadgeCheck, title: es ? "Tarjetas verificadas" : "Verified cards", body: es ? "Cada tarjeta muestra cómo se verificó y cuándo vence." : "Every card shows how it was verified and when it expires." },
-    { icon: ShieldCheck, title: es ? "Tarifa fija, al día 30" : "Flat fee, due on day 30", body: es ? "Reemplazo gratis si la persona se va antes de 90 días." : "Free replacement if the hire leaves within 90 days." },
+    { icon: ShieldCheck, title: es ? "Directo o temporal" : "Direct hire or temp crews", body: es ? "Contratación directa con tarifa fija, o cuadrillas temporales: nosotros pagamos la nómina, tú apruebas horas y recibes una factura semanal." : "Direct hire for a flat fee, or temp crews where we run payroll: you approve hours and get one weekly invoice." },
   ];
 
   return (
@@ -49,12 +58,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
               <HardHat size={14} /> {es ? "Área de Houston · English y Español" : "Greater Houston · English & Español"}
             </span>
             <h1 className="mt-5 text-4xl leading-[1.08] font-extrabold tracking-tight sm:text-5xl">
-              {es ? "Trabajo de oficio que te queda. Tarjetas siempre al día." : "Craft work that fits. Cards that stay current."}
+              {es ? "Trabajo por hora que te queda. Tarjetas siempre al día." : "Hourly and craft work that fits. Cards that stay current."}
             </h1>
             <p className="mt-4 max-w-xl text-lg text-blue-100">
               {es
-                ? "Para tuberos, soldadores, andamieros, electricistas y más. Encuentra trabajo, guarda tus certificaciones y capacítate para el siguiente puesto."
-                : "For pipefitters, welders, scaffold builders, electricians and more. Find work, keep your certifications in one place, and train for the next job."}
+                ? "Plantas, obras, almacenes y casas: tuberos, soldadores, carpinteros, montacarguistas, pintores, técnicos de mantenimiento y más. Trabajo directo o temporal con pago al día siguiente."
+                : "Plants, construction sites, warehouses and homes: pipefitters, welders, carpenters, forklift operators, painters, maintenance techs and more. Direct hire or temp work with next-day pay."}
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Link href="/onboard" className="btn bg-white px-5 text-brand-dark shadow-lg shadow-blue-950/20 hover:bg-blue-50">
@@ -148,11 +157,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 lg:grid-cols-[1fr_1.4fr]">
           <div>
             <div className="eyebrow">{es ? "Para empleadores" : "For employers"}</div>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{es ? "Gente de oficio verificada, sin cuotas de agencia" : "Verified craft workers, without agency markups"}</h2>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{es ? "Gente verificada para planta, obra, almacén y casas" : "Verified crews for plants, sites, warehouses and homes"}</h2>
             <p className="mt-3 text-[15px] text-slate-600">
               {es
-                ? "Publica un trabajo con los requisitos reales: tarjetas, nivel NCCER, turno y ubicación. Te mandamos una lista corta revisada."
-                : "Post a job with the real requirements: cards, NCCER level, shift and site. We send you a checked shortlist."}
+                ? "Publica un trabajo con los requisitos reales: tarjetas, nivel NCCER, turno y ubicación. Te mandamos una lista corta revisada, con calificaciones de otros empleadores y resultados de pruebas de habilidades."
+                : "Post a job with the real requirements: cards, NCCER level, shift and site. We send you a checked shortlist, with ratings from past employers and skills-test results."}
             </p>
             <Link href={hireHref} className="btn-primary mt-6">{es ? "Publicar un trabajo" : "Post a job"} <ArrowRight size={18} /></Link>
           </div>
@@ -175,9 +184,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             <div className="card lg:col-span-2">
               <div className="flex items-center gap-2 font-semibold"><Users size={18} className="text-brand" /> A worker</div>
-              <p className="muted mt-1">Sample profiles with different trades, cards and gaps.</p>
+              <p className="muted mt-1">Sample profiles across plants, construction, warehouses and homes. Darnell is on a temp warehouse crew with next-day pay.</p>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {workers.filter((w) => w.onboardingComplete).slice(0, 10).map((w) => (
+                {demoWorkers(workers).map((w) => (
                   <form key={w.id} action="/api/demo" method="post">
                     <input type="hidden" name="role" value="worker" />
                     <input type="hidden" name="workerId" value={w.id} />
@@ -188,7 +197,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold">{w.name}</span>
-                        <span className="block text-xs text-slate-500">{tradeLabel(w.trade, "en")} · {w.lang === "es" ? "Español" : "English"}</span>
+                        <span className="block text-xs text-slate-500">{tradeLabel(w.trade, "en")} · {sectorLabel(tradeSectors(w.trade)[0], "en")} · {w.lang === "es" ? "ES" : "EN"}</span>
                       </span>
                     </button>
                   </form>

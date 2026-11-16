@@ -13,11 +13,19 @@ import { LocationBar } from "@/components/LocationBar";
 import { AREAS } from "@/lib/geo";
 import { getUserLocation } from "@/lib/location";
 import { db } from "@/lib/db";
+import { HireTypeBadge, payText } from "@/components/CrewBadges";
+import { SECTORS } from "@/lib/taxonomy";
+import { slotLabel } from "@/lib/interviews";
 
-export default async function WorkerHome() {
+export default async function WorkerHome({ searchParams }: { searchParams: Promise<{ sector?: string }> }) {
+  const { sector } = await searchParams;
   const s = await requireWorker();
   const lang = await getLang();
-  const { worker, creds, fits, close, today } = await workerContext(s.workerId);
+  const ctx = await workerContext(s.workerId);
+  const { worker, creds, today } = ctx;
+  const inSector = (j: { sector?: string }) => !sector || (j.sector ?? "industrial") === sector;
+  const fits = ctx.fits.filter((f) => inSector(f.job));
+  const close = ctx.close.filter((f) => inSector(f.job));
   if (!worker || !worker.onboardingComplete) redirect("/onboard");
   const es = lang === "es";
   const loc = await getUserLocation(worker);
@@ -26,6 +34,8 @@ export default async function WorkerHome() {
   // Remember this visit so next time only newer jobs are marked "new".
   void (await db()).table("workers").upsert({ ...worker, lastSeenAt: new Date().toISOString() });
   const toAuthorize = (await (await db()).table("screenings").list({ workerId: worker.id } as never)).filter((x) => x.status === "awaiting_consent").length;
+  const interviews = (await (await db()).table("interviews").list({ workerId: worker.id } as never)).filter((i) => i.status === "proposed" || (i.status === "booked" && (i.chosenSlot ?? "") >= today));
+  const working = (await (await db()).table("assignments").list({ workerId: worker.id } as never)).filter((a) => a.status === "active");
 
   const alerts = creds.filter((c) => ["expired", "expiring"].includes(credentialStatus(c, today)));
   const unverified = creds.filter((c) => c.verification === "self").length;
@@ -68,6 +78,20 @@ export default async function WorkerHome() {
         </div>
       </section>
 
+      {interviews.map((iv) => (
+        <Link key={iv.id} href={`/me/interviews/${iv.id}`} className="mt-4 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700" data-testid="interview-banner">
+          <CalendarDays size={20} className="shrink-0" />
+          <span className="flex-1">{iv.status === "proposed" ? (es ? "¡Te quieren entrevistar! Escoge un horario." : "They want to interview you! Pick a time.") : `${es ? "Entrevista" : "Interview"}: ${slotLabel(iv.chosenSlot!, es)}`}</span>
+          <ChevronRight size={18} className="shrink-0 opacity-80" />
+        </Link>
+      ))}
+      {working.length > 0 && (
+        <Link href="/me/work" className="mt-4 flex items-center gap-3 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700" data-testid="work-banner">
+          <Clock size={20} className="shrink-0" />
+          <span className="flex-1">{es ? "Estás en un trabajo temporal: marca entrada y salida, y mira tu pago." : "You're on a temp assignment: clock in and out, and see your pay."}</span>
+          <ChevronRight size={18} className="shrink-0 opacity-80" />
+        </Link>
+      )}
       {toAuthorize > 0 && (
         <Link href="/me/screening" className="mt-4 flex items-center gap-3 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark" data-testid="authorize-banner">
           <ShieldAlert size={20} className="shrink-0" />
@@ -110,6 +134,11 @@ export default async function WorkerHome() {
         <h2 className="h2">{t(lang, "matchedJobs")}</h2>
         <span className="muted">{fits.length}</span>
       </div>
+      <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1" data-testid="sector-filter">
+        {[{ id: "", label: es ? "Todos" : "All" }, ...SECTORS.map((x) => ({ id: x.id, label: x.label[lang] }))].map((x) => (
+          <Link key={x.id || "all"} href={x.id ? `/me?sector=${x.id}` : "/me"} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-semibold ring-1 ${(sector ?? "") === x.id ? "bg-brand text-white ring-brand" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"}`}>{x.label}</Link>
+        ))}
+      </div>
       {fits.length === 0 && (
         <div className="card text-center">
           <BadgeCheck className="mx-auto text-slate-300" size={32} />
@@ -127,7 +156,9 @@ export default async function WorkerHome() {
               <ScorePill score={result.score} eligible />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="chip"><DollarSign size={13} className="text-brand" />{job.payMin}–{job.payMax}{t(lang, "perHour")}</span>
+              <span className="chip"><DollarSign size={13} className="text-brand" />{payText(job).slice(1)}</span>
+              {job.hireType === "temp" && <HireTypeBadge job={job} lang={lang} />}
+              {job.perDiem ? <span className="chip">+${job.perDiem}/{es ? "día viáticos" : "day per diem"}</span> : null}
               <span className="chip"><Clock size={13} className="text-brand" />{shiftLabel(job.shift, lang)}</span>
               {result.distanceMiles !== null && <span className="chip"><MapPin size={13} className="text-brand" />{Math.round(result.distanceMiles)} {t(lang, "miles")}</span>}
               <span className="chip"><CalendarDays size={13} className="text-brand" />{job.startDate}</span>

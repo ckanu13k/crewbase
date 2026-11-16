@@ -144,3 +144,19 @@ describe("defaultExpiry", () => {
     expect(defaultExpiry("osha10", "2024-03-15")).toBeNull();
   });
 });
+
+describe("offline extractor, new sectors", () => {
+  it("picks the specific trade over an entry-level one on a tie", async () => {
+    const { rulesExtract } = await import("./ai/rules");
+    expect(rulesExtract("I drive forklift at a warehouse 3 years").trade).toBe("forklift_operator");
+    expect(rulesExtract("trabajo de montacargas en bodega, 2 años").trade).toBe("forklift_operator");
+    expect(rulesExtract("framer 6 years, framing and trusses").trade).toBe("carpenter");
+    expect(rulesExtract("CDL class A truck driver 8 years").trade).toBe("driver");
+    expect(rulesExtract("apartment make ready maintenance tech").trade).toBe("maintenance_tech");
+  });
+  it("reads OSHA 10 general industry as the general-industry card only", async () => {
+    const { rulesExtract } = await import("./ai/rules");
+    expect(rulesExtract("OSHA 10 general industry").credentials.map((c) => c.type)).toEqual(["osha10_gi"]);
+    expect(rulesExtract("OSHA 10 construction and OSHA 10 general industry").credentials.map((c) => c.type).sort()).toEqual(["osha10", "osha10_gi"]);
+  });
+});

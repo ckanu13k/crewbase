@@ -4,6 +4,7 @@
 // them for the worker (lib/ai/explain.ts), so it can never invent a job requirement.
 
 import { distanceMiles } from "./geo";
+import { isEntryTrade } from "./taxonomy";
 import type { Credential, Job, Verification, Worker } from "./types";
 
 export const EXPIRING_SOON_DAYS = 60;
@@ -13,6 +14,7 @@ export const SATISFIES: Record<string, string[]> = {
   osha30: ["osha10"],
   tdlr_master_electrician: ["tdlr_journeyman_electrician", "tdlr_apprentice_electrician"],
   tdlr_journeyman_electrician: ["tdlr_apprentice_electrician"],
+  tsbpe_journeyman: ["tsbpe_apprentice"],
 };
 
 export type CredStatus = "valid" | "expiring" | "expired" | "no_expiry";
@@ -132,8 +134,9 @@ export function evaluateMatch(worker: Worker, creds: Credential[], job: Job, tod
   if (worker.trade !== job.trade) {
     trade = 0;
     // Someone from another trade qualifies only if they already have at least half the job's skills
-    // (a welder who fits pipe can take a fitter job; an electrician can't). Anyone can be a helper.
-    const crossesOver = job.trade === "helper" || (job.requiredSkills.length > 0 && matchedSkills.length * 2 >= job.requiredSkills.length);
+    // (a welder who fits pipe can take a fitter job; an electrician can't). Entry-level jobs (helper,
+    // warehouse associate, picker/packer, mover, cleaner, landscaper) are open to anyone.
+    const crossesOver = isEntryTrade(job.trade) || (job.requiredSkills.length > 0 && matchedSkills.length * 2 >= job.requiredSkills.length);
     gaps.push({ kind: "trade", blocking: !crossesOver, have: worker.trade, need: job.trade });
   }
 

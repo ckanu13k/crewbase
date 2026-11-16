@@ -76,8 +76,8 @@ function msg(lang: Lang, key: string, v: Record<string, string | number> = {}): 
     name: { en: "What's your name?", es: "¿Cómo te llamas?" },
     trade: { en: "Thanks, {name}. What's your main trade? Reply with a number:\n{list}\nOr describe it in your own words.", es: "Gracias, {name}. ¿Cuál es tu oficio principal? Responde con un número:\n{list}\nO descríbelo con tus palabras." },
     experience: {
-      en: "Tell us about your experience in your own words: years in the trade, the work you've done (plants, shops, turnarounds), tools you use, and any cards (OSHA, NCCER, TWIC, licenses).",
-      es: "Cuéntanos tu experiencia con tus palabras: años en el oficio, qué trabajos has hecho (plantas, talleres, paros), herramientas, y tus tarjetas (OSHA, NCCER, TWIC, licencias).",
+      en: "Tell us about your experience in your own words: years in the trade, the work you've done (plants, construction sites, warehouses, homes), tools and equipment you use, and any cards (OSHA, NCCER, TWIC, forklift, CDL, licenses).",
+      es: "Cuéntanos tu experiencia con tus palabras: años en el oficio, qué trabajos has hecho (plantas, obras, almacenes, casas), herramientas y equipo, y tus tarjetas (OSHA, NCCER, TWIC, montacargas, CDL, licencias).",
     },
     confirm: { en: "Here's what we got:\n{summary}\nIs that right? Reply 1 for yes, or 2 and tell us what to fix.", es: "Esto es lo que entendimos:\n{summary}\n¿Está bien? Responde 1 para sí, o 2 y dinos qué corregir." },
     fix: { en: "What should we fix or add?", es: "¿Qué corregimos o agregamos?" },
@@ -88,8 +88,8 @@ function msg(lang: Lang, key: string, v: Record<string, string | number> = {}): 
     shifts: { en: "Which shifts work for you? Reply all that fit, like 1 3:\n1) Days\n2) Nights\n3) Rotating\n4) Turnarounds / shutdowns", es: "¿Qué turnos te sirven? Responde todos los que apliquen, por ejemplo 1 3:\n1) Día\n2) Noche\n3) Rotativo\n4) Paros de planta" },
     pickNumber: { en: "Please reply with a number from the list.", es: "Responde con un número de la lista." },
     cards: {
-      en: "Last step: send photos of your cards (OSHA, NCCER, TWIC, licenses), front side, one at a time. Reply DONE when finished, or SKIP.",
-      es: "Último paso: manda fotos de tus tarjetas (OSHA, NCCER, TWIC, licencias), del frente, una por una. Responde LISTO cuando termines, o SALTAR.",
+      en: "Last step: send photos of your cards (OSHA, NCCER, TWIC, forklift, CDL, licenses), front side, one at a time. Reply DONE when finished, or SKIP.",
+      es: "Último paso: manda fotos de tus tarjetas (OSHA, NCCER, TWIC, montacargas, CDL, licencias), del frente, una por una. Responde LISTO cuando termines, o SALTAR.",
     },
     cardsVoice: { en: "We'll text you a link to add photos of your cards.", es: "Te mandaremos un enlace por texto para agregar fotos de tus tarjetas." },
     cardGot: { en: "Got it: {card}{exp}. Send another photo or reply DONE.", es: "Recibida: {card}{exp}. Manda otra foto o responde LISTO." },

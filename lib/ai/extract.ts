@@ -30,11 +30,14 @@ const SCHEMA = {
   },
 };
 
-const SYSTEM = `You turn a construction or industrial craft worker's own words (often a voice transcript or a text message,
+const SYSTEM = `You turn a craft or hourly worker's own words (plants, construction, warehouses, home services) (often a voice transcript or a text message,
 in English or Spanish, possibly with typos) into a structured profile.
 Rules:
 - Only include a skill or credential the worker clearly says they have. Never guess or infer extras.
-- "Tubero" = pipefitter, "andamiero" = scaffold builder, "soldador" = welder, "ayudante" = helper.
+- "Tubero" = pipefitter, "andamiero" = scaffold builder, "soldador" = welder, "ayudante" = helper,
+  "carpintero"/"armador" = carpenter, "montacarguista"/"operador de montacargas" = forklift operator,
+  "almacenista"/"bodega" = warehouse associate, "pintor" = painter, "plomero" = plumber, "techador" = roofer,
+  "mantenimiento" = maintenance technician, "jardinero" = landscaper, "chofer"/"trailero" with CDL = CDL driver.
 - If they mention a card or certification that isn't in the list, leave it out.
 - Years: total years in the trade. If they give a range, use the lower number.
 - Lower the confidence when the text is short, vague, or contradictory.`;

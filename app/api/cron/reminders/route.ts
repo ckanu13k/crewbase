@@ -1,4 +1,4 @@
-// Daily credential-expiry texts and new-job alerts. Vercel Cron calls this with "Authorization: Bearer $CRON_SECRET".
+// Daily credential-expiry texts, new-job alerts and next-day pay. Vercel Cron calls this with "Authorization: Bearer $CRON_SECRET".
 import { NextResponse } from "next/server";
 import { can } from "@/lib/permissions";
 import { runExpiryReminders } from "@/lib/reminders";
@@ -11,5 +11,7 @@ export async function GET(req: Request) {
   const sent = await runExpiryReminders();
   const { runJobAlerts } = await import("@/lib/alerts");
   const alerts = await runJobAlerts();
-  return NextResponse.json({ sent: sent.length, details: sent, jobAlerts: alerts.length });
+  const { sendDueNextDayPayouts } = await import("@/lib/crew");
+  const payouts = await sendDueNextDayPayouts();
+  return NextResponse.json({ sent: sent.length, details: sent, jobAlerts: alerts.length, nextDayPayouts: payouts });
 }

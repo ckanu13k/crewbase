@@ -3,6 +3,11 @@
 export type Lang = "en" | "es";
 export type Shift = "day" | "night" | "rotating" | "turnaround";
 export type Channel = "web" | "sms" | "whatsapp" | "voice";
+/** Where the work is. Industrial = refineries, chemical plants and fab shops. */
+export type Sector = "industrial" | "construction" | "warehouse" | "residential";
+/** Direct hire (employer's payroll, one placement fee) or temp (CrewPass is the employer of record and bills hourly). */
+export type HireType = "direct" | "temp";
+export type PayoutSpeed = "weekly" | "next_day" | "instant";
 
 /** How much we trust a credential. Drives the badge shown to employers. */
 export type Verification = "self" | "document" | "verified";
@@ -19,6 +24,9 @@ export interface Worker {
   email?: string | null; // optional; lets a worker sign in and get alerts by email
   alerts?: "sms" | "email" | "none";
   lastSeenAt?: string | null;
+  /** Temp work: how fast approved hours are paid out (free for workers), and payroll onboarding (W-4, I-9, deposit) with the payroll partner. */
+  payoutSpeed?: PayoutSpeed;
+  payrollStatus?: "not_started" | "invited" | "ready";
   shifts: Shift[];
   trade: string | null; // TradeId
   yearsExperience: number | null;
@@ -55,6 +63,10 @@ export interface Employer {
   email: string;
   phone: string;
   zip: string;
+  sector?: Sector | null;
+  /** Outgoing webhook to the employer's applicant-tracking system (https only). The secret signs each delivery. */
+  atsWebhookUrl?: string | null;
+  atsWebhookSecret?: string | null;
   createdAt: string;
 }
 
@@ -82,6 +94,12 @@ export interface Job {
   /** Hiring steps the employer requires before day one. */
   requiresBackground?: boolean;
   requiresDrug?: boolean;
+  sector?: Sector;
+  hireType?: HireType;
+  /** Temp only: per diem paid for each day worked, the planned last day, and the employer's PO / work-order number. */
+  perDiem?: number | null;
+  endDate?: string | null;
+  workOrder?: string | null;
   status: JobStatus;
   description: string;
   createdAt: string;
@@ -266,5 +284,188 @@ export interface Provider {
   name: string;
   contactEmail: string;
   website: string | null;
+  createdAt: string;
+}
+
+// ---------------- Temp crews: assignments, timesheets, payroll ----------------
+
+export interface Assignment {
+  id: string;
+  jobId: string;
+  workerId: string;
+  employerId: string;
+  matchId: string | null;
+  startDate: string;
+  endDate: string | null;
+  payRate: number; // $/hr to the worker
+  billRate: number; // $/hr billed to the employer
+  perDiem: number; // $ per day worked (0 = none)
+  workOrder: string | null;
+  status: "active" | "ended" | "canceled";
+  endedReason: string | null;
+  createdAt: string;
+}
+
+export type Attendance = "worked" | "late" | "no_show" | "called_off";
+
+export interface Timesheet {
+  id: string;
+  assignmentId: string;
+  workerId: string;
+  employerId: string;
+  jobId: string;
+  date: string; // the day the shift started
+  clockIn: string | null; // HH:MM, local time
+  clockOut: string | null;
+  breakMinutes: number;
+  hours: number;
+  attendance: Attendance;
+  perDiem: boolean;
+  status: "open" | "submitted" | "approved" | "disputed";
+  note: string;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  payRunId: string | null;
+  payoutId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayLine {
+  workerId: string;
+  hours: number;
+  regHours: number;
+  otHours: number;
+  straightPay: number;
+  otPremium: number;
+  gross: number;
+  perDiem: number;
+  paidEarly: number; // gross already sent as next-day / instant pay
+  balance: number; // gross still due on payday
+}
+
+export interface PayInvoice {
+  employerId: string;
+  regHours: number;
+  otHours: number;
+  labor: number;
+  perDiem: number;
+  total: number;
+  invoiceId: string | null;
+  invoiceUrl: string | null;
+}
+
+export interface PayRun {
+  id: string;
+  periodStart: string; // Monday
+  periodEnd: string; // Sunday
+  status: "draft" | "approved" | "paid";
+  lines: PayLine[];
+  invoices: PayInvoice[];
+  timesheetIds: string[];
+  createdBy: string;
+  createdAt: string;
+  approvedAt: string | null;
+  paidAt: string | null;
+}
+
+export interface Payout {
+  id: string;
+  workerId: string;
+  timesheetId: string;
+  amount: number; // gross; the payroll partner withholds taxes
+  speed: "next_day" | "instant";
+  status: "pending" | "sent" | "failed";
+  providerRef: string | null;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+// ---------------- Ratings and crews ----------------
+
+export interface Rating {
+  id: string;
+  workerId: string;
+  employerId: string;
+  jobId: string;
+  assignmentId: string | null;
+  placementId: string | null;
+  quality: number; // 1-5
+  safety: number; // 1-5
+  rehire: boolean;
+  comment: string; // seen by the employer and our team, not the worker
+  by: string;
+  createdAt: string;
+}
+
+export interface CrewMember {
+  id: string;
+  employerId: string;
+  workerId: string;
+  note: string;
+  addedBy: string;
+  createdAt: string;
+}
+
+// ---------------- Skills assessments ----------------
+
+export interface AssessmentAttempt {
+  id: string;
+  workerId: string;
+  assessmentId: string;
+  kind: "knowledge" | "hands_on";
+  questionIds: string[];
+  answers: number[] | null;
+  startedAt: string;
+  completedAt: string | null;
+  score: number | null; // 0-100
+  passed: boolean | null;
+  proctored: boolean;
+  assessor: string | null; // hands-on: who watched the worker do it
+  note: string | null;
+}
+
+// ---------------- Benefits ----------------
+
+export type BenefitKind = "workers_comp" | "occupational_accident" | "health" | "dental_vision" | "paid_time_off" | "retirement" | "other";
+
+export interface BenefitPlan {
+  id: string;
+  kind: BenefitKind;
+  name: string;
+  carrier: string;
+  status: "active" | "planned";
+  eligibility: string;
+  workerCost: string;
+  url: string | null;
+  createdAt: string;
+}
+
+// ---------------- Interviews ----------------
+
+export interface Interview {
+  id: string;
+  matchId: string;
+  jobId: string;
+  workerId: string;
+  employerId: string;
+  slots: string[]; // "YYYY-MM-DDTHH:MM", America/Chicago
+  chosenSlot: string | null;
+  mode: "in_person" | "phone" | "video";
+  location: string;
+  status: "proposed" | "booked" | "canceled";
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------- Pay comparison ----------------
+
+export interface PayReport {
+  id: string;
+  workerId: string | null;
+  trade: string;
+  zip: string;
+  hourly: number;
   createdAt: string;
 }

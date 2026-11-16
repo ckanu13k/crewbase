@@ -11,6 +11,7 @@ import { credLabel, skillLabel, tradeLabel } from "@/lib/taxonomy";
 import { FUNDING_LABEL, gapText, money, programsForGaps, shiftLabel } from "@/lib/training";
 import { explainGaps } from "@/lib/ai/explain";
 import { expressInterest } from "@/app/actions";
+import { payText } from "@/components/CrewBadges";
 import type { Credential, Match } from "@/lib/types";
 
 export default async function WorkerJob({ params }: { params: Promise<{ id: string }> }) {
@@ -37,7 +38,7 @@ export default async function WorkerJob({ params }: { params: Promise<{ id: stri
   const realGaps = r.gaps.filter((g) => g.kind !== "trade");
 
   const facts4 = [
-    { icon: DollarSign, label: es ? "Pago" : "Pay", value: `$${job.payMin}–${job.payMax}${t(lang, "perHour")}` },
+    { icon: DollarSign, label: es ? "Pago" : "Pay", value: payText(job) + (job.perDiem ? ` + $${job.perDiem}/${es ? "día" : "day"}` : "") },
     { icon: Clock, label: es ? "Turno" : "Shift", value: shiftLabel(job.shift, lang) },
     { icon: CalendarDays, label: t(lang, "starts"), value: job.startDate },
     { icon: MapPin, label: es ? "Distancia" : "Distance", value: r.distanceMiles !== null ? `${Math.round(r.distanceMiles)} mi` : `ZIP ${job.zip}` },
@@ -68,6 +69,14 @@ export default async function WorkerJob({ params }: { params: Promise<{ id: stri
             </div>
           ))}
         </div>
+        {job.hireType === "temp" && (
+          <div className="mt-4 rounded-xl bg-violet-50 px-3 py-2.5 text-sm text-violet-900 ring-1 ring-violet-200" data-testid="temp-info">
+            <b>{es ? "Trabajo temporal con CrewPass." : "Temp job through CrewPass."}</b>{" "}
+            {es
+              ? `CrewPass es tu empleador: te paga cada semana (o al instante si quieres), con seguro de accidentes de trabajo.${job.endDate ? ` Hasta el ${job.endDate}.` : ""}${job.perDiem ? ` Viáticos de $${job.perDiem} por día trabajado.` : ""}`
+              : `CrewPass is your employer: paid weekly (or instantly if you want), with workers' comp coverage.${job.endDate ? ` Runs until ${job.endDate}.` : ""}${job.perDiem ? ` $${job.perDiem} per diem for each day worked.` : ""}`}
+          </div>
+        )}
         {job.description && <p className="mt-4 text-[15px] text-slate-700">{job.description}</p>}
         <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
           <div><span className="font-semibold">{es ? "Requisitos" : "Requirements"}:</span>{" "}
